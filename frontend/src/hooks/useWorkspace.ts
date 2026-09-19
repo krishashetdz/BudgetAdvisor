@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { api, errorMessage } from '../api';
-import { Dataset, Item, Mode, Run, Snapshot } from '../types';
+import { Dataset, Item, Mode, Run, Snapshot, LiveProgress } from '../types';
+import { streamSearch } from '../stream';
 
 const precision = (s: string) => /^-?\d+(\.\d{0,2})?$/.test(s);
 export function validate(data: Dataset): string | null {
@@ -29,6 +30,8 @@ export function useWorkspace() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [maxNodes, setMaxNodes] = useState(50000);
+  const [live, setLive] = useState<LiveProgress>({});
+  const controller = useRef<AbortController | null>(null);
   const version = useRef(0);
   const initialized = useRef(false);
 
@@ -36,12 +39,16 @@ export function useWorkspace() {
     const validation = validate(data);
     if (validation) { setError(validation); return; }
     const requestVersion = ++version.current;
-    setBusy(true); setRun(null); setError(null);
+    controller.current?.abort();
+    const abort = new AbortController(); controller.current = abort;
+    setBusy(true); setRun(null); setError(null); setLive({});
     try {
       const snapshot: Snapshot = { ...data, max_nodes: limit, time_limit_ms: 1500 };
-      const response = await api.post<Run>('/solve', snapshot);
-      if (version.current === requestVersion) setRun(response.data);
-    } catch (e) { if (version.current === requestVersion) setError(errorMessage(e)); }
+      const response = await streamSearch(snapshot, abort.signal, event => {
+        if (version.current === requestVersion) setLive(prev => ({ ...prev, [event.strategy]: event }));
+      });
+      if (version.current === requestVersion) setRun(response);
+    } catch (e) { if (version.current === requestVersion && !abort.signal.aborted) setError(e instanceof Error ? e.message : errorMessage(e)); }
     finally { if (version.current === requestVersion) setBusy(false); }
   }, []);
 
@@ -56,7 +63,7 @@ export function useWorkspace() {
   }, [compute]);
   useEffect(() => { if (!initialized.current) { initialized.current = true; void initialize(); } }, [initialize]);
 
-  const invalidate = () => { version.current++; setRun(null); setBusy(false); setError(null); };
+  const invalidate = () => { version.current++; controller.current?.abort(); setRun(null); setBusy(false); setError(null); setLive({}); };
   const edit = (patch: Partial<Dataset>) => {
     invalidate();
     setDatasets(prev => prev ? { ...prev, [mode]: { ...prev[mode], ...patch } } : prev);
@@ -72,7 +79,7 @@ export function useWorkspace() {
   };
   return { mode, datasets, data: datasets?.[mode], run,
     setRun: (saved: Run) => setRun(current => current?.id === saved.id ? saved : current),
-    busy, loading, error, maxNodes,
+    busy, loading, error, maxNodes, live,
     compute: () => datasets && compute(datasets[mode], maxNodes), initialize, edit, updateItem, switchMode, restore,
     setLimit: (limit: number) => { invalidate(); setMaxNodes(limit); },
     reset: () => { if (samples.current) { edit(samples.current[mode]); toast.success('Sample dataset restored'); } },

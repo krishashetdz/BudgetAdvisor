@@ -8,3 +8,11 @@
 - Confirmed root inspection,replay reset/step,capped10-node unproven status,restoration to50000-node complete search,seeded totals,and saved/methodology navigation.
 - Guarded late save responses so a different or invalidated current run cannot be overwritten.
 - No outstanding functional issues identified. No external APIs or simulated integrations.
+
+## Redesign / DP / stream verification — 2026-09-19
+- Full backend suite increased to **70 passing tests**; new file `backend/tests/test_dp_stream_regression.py`.
+- E2E report `iteration_3.json`: DP parity, stream events/disconnect recovery, honest synchronized race, replay controls, pruning/tooltips, stale-input cancellation, mobile24-item/long-name layout, caps and saved-run persistence passed.
+- Follow-up explicitly checked legacy saved data with missing DP/progress: old results89/41 intact; DP absent rather than invented; detailed replay unavailable with explanation. Rerun produced complete three-method results. Temporary fixture cleanup returned200.
+- Found and fixed an active-notification overflow when resizing desktop to390px; final toaster bounds left16/right374/width358, overflow empty. Neutral notification styling now matches the product palette.
+- Final screenshots: real browser at1920×800 and390×844. Both race layouts and active toast states verified without horizontal overflow; console error list empty.
+- All agreed flows functional. Race playback is explicitly paced by measured visit order, not advertised as a wall-clock benchmark. Actual compute progress is separately streamed.

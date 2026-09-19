@@ -98,3 +98,43 @@ Use “Budget Advisor” as the title, 8 sample items per mode, and a saved-runs
 - P2 explicit decision required: alternative expected rupee-gain objective; must not silently change the existing additive-score model.
 - P2 optional: export/import assigned datasets; explicit local draft persistence.
 - Out of scope: live market data, brokerage, payments, multi-user auth.
+
+## Visual & interaction redesign — 2026-09-19
+
+### New user requirements
+Elevate the current application to a professional portfolio-grade product: distinct display/body typography and a real type scale; budget and optimal value as the dominant numbers; intentional spacing and grid alignment. Make the search tree the centerpiece: animated individual node visits, genuine side-by-side FIFO/LC counters, persistent greyed-out pruning, a replayable scrubber/timeline. Replace the donut with horizontal budget allocation. Add an independent DP baseline strip with value, time and explored work. Animate result numbers. Provide purposeful hovers, custom node bound/value tooltips, crossfaded mode/dataset/accent changes, actual computing progress instead of generic spinners. No gradients, glow, blur, glassmorphism, neon, rainbow coding, decorative filler or large shadows; consistent Lucide icons.
+
+### Clarified user choices
+- Keep comparisons honest even when LC ties or visits more nodes. A favorable initial demo is fine; never force LC superiority or invent a progress denominator.
+- Graphite text, muted teal accent and cool off-white surfaces.
+- Independent resource-bounded exact DP with state evaluations explicitly distinguished from B&B node visits.
+
+### Implemented changes
+- Rebuilt the workspace around two side-by-side SVG decision trees, stacked responsively on mobile. Race now precedes inputs; supporting results use an aligned, border-led layout.
+- Sora display font with DM Sans body; tokenized 11/12/14/16/18/36/52 type scale. Budget and optimal value are the largest metrics. INR input groups digits while blurred, accepts comma paste, uses raw editable values on focus, and scales safely for long amounts.
+- Large optimal value, restrained cost/remaining/selection metrics, animated result numbers, horizontal spent/remaining allocation, recommended-item list and a three-method verification strip.
+- Actual server progress is streamed via `POST /api/solve/stream` using NDJSON. FIFO, LC and DP compute concurrently. Versioned requests and AbortController prevent stale stream events/results after input edits or mode changes; disconnects release execution slots.
+- Search playback is explicitly **visit-synchronized, not a wall-clock benchmark**. Human-paced 110ms measured steps by default, 0.5×/1×/2×, play/pause/reset/step/jump-to-result/scrub. Actual per-method visited/pruned/frontier/best-value frames drive counters. A completed method stops while the other continues. Compute times exclude animation, but include instrumentation/concurrent scheduling and can vary.
+- First100 visited nodes recorded individually; every rendered-node visit retained regardless of position; long searches sampled every250 visits plus final frame. At most30 generated tree nodes rendered per method; full aggregates and collapsed indicators preserved. No fabricated progress totals.
+- Nodes enter with scale/fade; pruned nodes remain visible in grey. Final selected-prefix paths are only highlighted once that method finishes. Node hover, focus and tap show value/bound/cost/decision/status in a custom tooltip. Reduced-motion preferences suppress automatic replay/count-up effects.
+- Independent sparse-cost DP recurrence uses exact integer hundredths and max-score/min-cost/original-index-lexicographic ties, without B&B upper bounds. Limits:50000 retained cost states,200000 include-transition evaluations,1500ms. Every capped method retains explicit unproven status.
+- DP work metric: initial empty state counts once, then one evaluation per include transition attempted from a prior-layer cost state (including over-budget transitions). State evaluations and B&B node visits are explicitly different units.
+- Existing `/api/solve` remains functional and also returns DP. New `Run.dp` and `SolverResult.progress` have backward-compatible defaults. Named saved runs persist DP/progress for new runs. Legacy snapshots show `DP not recorded`, preserve original B&B counts/results, and disable missing detailed replay instead of inventing events. Recalculation enables the complete experience.
+- Current seeded sample retained because its genuine measured results already demonstrate LC finishing with41 visits vs FIFO89. All three independently return364 points,₹9700 spend,5items,₹300remaining; DP137 state evaluations. Values are not hardcoded in the UI.
+- Dataset mode transitions crossfade and shift the accent within the restrained teal palette. Reused existing validated edits, CRUD, mode isolation, edge cases and capped-search safeguards.
+- Notifications restyled to neutral white/graphite/teal with Lucide icons and subtle2px shadows. Fixed Sonner viewport-resize overflow while a notification is active; mobile toaster bounds16..374 within390px.
+
+### Verification
+- `/app/test_reports/iteration_3.json`: no reproducible product defects; new independent DP/stream regression suite added.
+- Full backend suite: **70 tests passed** (37 original solver,17 public-URL API,16 DP/stream regression).
+- DP cross-checked independently against exhaustive enumeration, including random fractional/tied/negative/zero/empty/no-fit/all-fit data; state/evaluation/time caps covered.
+- Stream monotonicity, bounded progress/traces, preserved validation, disconnect recovery and slot release verified.
+- Browser verified at exactly1920×800 and390×844: actual race increments/final counts, replay controls/pruning/tooltips, stale-stream invalidation, mode transitions, formatted budget input, cap10 proof labels, save/restore, reduced motion,24items and70-character names.
+- Separately created and cleaned up a temporary legacy snapshot missing both DP and detailed progress. Restored B&B89/41, showed no invented DP value, disabled unavailable replay, then recalculated to DP364 with the full race. Fixture deleted successfully.
+- Final post-fix browser checks:0 console errors;0 horizontal overflow at both widths, including an active mobile notification. Typecheck and production build pass.
+
+### Next priorities
+- P0: None outstanding in requested redesign scope.
+- P1 optional: presentation-focused full-screen race view and exportable comparison/trace handout.
+- P1 optional: named edge-case presets for viva rehearsals.
+- P2: expected rupee-gain objective only after an explicit product decision; no silent change to additive educational scores.

@@ -1,32 +1,64 @@
 import { useEffect, useMemo, useState } from 'react';
-import { GitFork, Play, Pause, RotateCcw, StepForward, Info } from 'lucide-react';
-import { Run, TraceNode, money, number } from '../types';
+import { useReducedMotion } from 'framer-motion';
+import { Play, Pause, RotateCcw, StepForward, SkipForward, Check, GitBranch, Info } from 'lucide-react';
+import { Run, SearchFrame, SolverResult, LiveProgress, number } from '../types';
 import { TreeGraphic } from './TreeGraphic';
 
-export const SearchTree = ({ run }: { run: Run | null }) => {
-  const [strategy, setStrategy] = useState<'fifo' | 'lc'>('lc');
+const emptyFrame: SearchFrame = { visited: 0, pruned: 0, best_score: 0, frontier: 0, generated: 0 };
+function frames(result?: SolverResult): SearchFrame[] {
+  if (!result) return [];
+  return result.progress?.length ? result.progress : [{ visited: result.visited, pruned: result.pruned,
+    best_score: result.total_score, frontier: result.frontier_remaining, generated: result.generated }];
+}
+function atVisit(list: SearchFrame[], visit: number): SearchFrame {
+  let lo = 0, hi = list.length - 1, found = -1;
+  while (lo <= hi) { const mid = Math.floor((lo + hi) / 2); if (list[mid].visited <= visit) { found = mid; lo = mid + 1; } else hi = mid - 1; }
+  return found < 0 ? emptyFrame : list[found];
+}
+
+export const SearchTree = ({ run, live, busy }: { run: Run | null; live: LiveProgress; busy: boolean }) => {
   const [step, setStep] = useState(0);
   const [playing, setPlaying] = useState(false);
-  const [speed, setSpeed] = useState(650);
-  const [focused, setFocused] = useState<TraceNode | null>(null);
-  const result = run?.[strategy];
-  const visits = useMemo(() => (result?.trace || []).filter(t => t.visit_order !== null).sort((a, b) => a.visit_order! - b.visit_order!), [result]);
-  useEffect(() => { setStep(visits.length); setPlaying(false); setFocused(null); }, [visits]);
+  const [speed, setSpeed] = useState(110);
+  const reduced = useReducedMotion();
+  const legacy = !!run && (!run.fifo.progress?.length || !run.lc.progress?.length);
+  const fifoFrames = useMemo(() => frames(run?.fifo), [run?.fifo]);
+  const lcFrames = useMemo(() => frames(run?.lc), [run?.lc]);
+  const timeline = useMemo(() => [0, ...Array.from(new Set([...fifoFrames, ...lcFrames].map(f => f.visited).filter(v => v > 0))).sort((a, b) => a - b)], [fifoFrames, lcFrames]);
   useEffect(() => {
-    if (!playing) return;
+    const autoplay = !!run && !run.saved && !reduced && !legacy;
+    setStep(autoplay ? 0 : timeline.length - 1); setPlaying(autoplay);
+    // A save response must not restart a running replay.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [run?.id, reduced]);
+  useEffect(() => {
+    if (!playing || !run) return;
     const timer = window.setInterval(() => setStep(s => {
-      if (s >= visits.length) { setPlaying(false); return s; } return s + 1;
+      if (s >= timeline.length - 1) { setPlaying(false); return s; }
+      return s + 1;
     }), speed);
     return () => window.clearInterval(timer);
-  }, [playing, visits.length, speed]);
-  const currentOrder = step > 0 ? visits[step - 1]?.visit_order || 0 : 0;
-  const selected = focused || (step > 0 ? visits[step - 1] : result?.trace[0]);
-  return <section className="search-tree-section"><div className="tree-heading"><div><div className="section-heading"><GitFork size={18}/><h2 data-testid="tree-heading">The search, unfolded.</h2><span className="subtle-tag">BRANCH & BOUND</span></div><p data-testid="tree-subtitle">Every branch is a decision. Every bound narrows the possibilities.</p></div><div className="tree-strategy-switch" role="group" aria-label="Search tree strategy">{(['fifo', 'lc'] as const).map(s => <button key={s} className={s === strategy ? 'active' : ''} data-testid={`tree-${s}-button`} aria-pressed={s === strategy} onClick={() => setStrategy(s)}>{s.toUpperCase()}<span>{s === 'fifo' ? 'Queue' : 'Priority queue'}</span></button>)}</div></div>
-    <div className="tree-tool"><div className="tree-tool-header"><div className="tree-legends"><span><i className="tree-key solution"/>Selected path</span><span><i className="tree-key explored"/>Explored</span><span><i className="tree-key pruned"/>Pruned</span><span><i className="tree-key frontier"/>Frontier</span></div><span data-testid="tree-rendered-count">{result ? `${result.trace.length} of ${number(result.generated)} generated nodes` : 'Awaiting calculation'}</span></div>
-      <div className="tree-canvas">{result ? <TreeGraphic nodes={result.trace} currentOrder={currentOrder} onFocus={setFocused} focusedId={selected?.id}/> : <div className="tree-empty" data-testid="tree-empty-state"><GitFork size={32}/><strong>A new search starts here.</strong><span>Find a combination to reveal the decision tree.</span></div>}</div>
-      {result && selected && <div className="node-details" data-testid="node-details"><label>Node <select data-testid="inspect-node-select" aria-label="Inspect tree node" value={selected.id} onChange={e => setFocused(result.trace.find(n => n.id === +e.target.value) || null)}>{result.trace.map(n => <option key={n.id} value={n.id} children={`#${n.id}`}/>)}</select></label><span data-testid="node-decision">{selected.decision === 'root' ? 'Root' : `${selected.decision === 'include' ? 'Include' : 'Exclude'} ${selected.item_name}`}</span><span>Cost <b data-testid="node-cost">{money(selected.cost)}</b></span><span>Score <b data-testid="node-score">{number(selected.score)}</b></span><span>Bound <b data-testid="node-bound">{selected.bound === null ? 'Infeasible' : number(selected.bound)}</b></span><span className="node-state" data-testid="node-state">{selected.visit_order !== null && selected.visit_order <= currentOrder ? selected.status.replaceAll('_', ' ') : 'frontier'}</span></div>}
-      <div className="playback-bar"><div className="playback-buttons"><button className="icon-button" data-testid="replay-reset-button" title="Reset replay" aria-label="Reset replay" disabled={!run} onClick={() => { setStep(0); setPlaying(false); setFocused(null); }}><RotateCcw size={15}/></button><button className="play-button" data-testid="replay-play-button" aria-label={playing ? 'Pause replay' : 'Play replay'} disabled={!run || !visits.length} onClick={() => { if (step >= visits.length) setStep(0); setFocused(null); setPlaying(!playing); }}>{playing ? <Pause size={13}/> : <Play size={13}/>}</button><button className="icon-button" data-testid="replay-step-button" title="Next shown visit" aria-label="Next shown visit" disabled={!run || step >= visits.length} onClick={() => { setPlaying(false); setFocused(null); setStep(s => Math.min(s + 1, visits.length)); }}><StepForward size={16}/></button><span className="replay-label">Replay search</span></div><input className="replay-slider" data-testid="replay-slider" aria-label="Replay progress" type="range" min="0" max={Math.max(1, visits.length)} value={step} disabled={!run} onChange={e => { setStep(+e.target.value); setPlaying(false); setFocused(null); }}/><span className="replay-step-count" data-testid="replay-step-count">{step} / {visits.length} shown visits</span><select data-testid="replay-speed-select" aria-label="Replay speed" value={speed} onChange={e => setSpeed(+e.target.value)}><option value={1300}>0.5×</option><option value={650}>1×</option><option value={325}>2×</option></select></div>
+  }, [playing, speed, timeline.length, run]);
+  const tick = timeline[Math.min(step, timeline.length - 1)] || 0;
+  const finished = !!run && step >= timeline.length - 1;
+  const hasBatching = timeline.some((v, i) => i > 0 && v - timeline[i - 1] > 1);
+  const go = (n: number) => { setPlaying(false); setStep(Math.max(0, Math.min(timeline.length - 1, n))); };
+  return <section className="race-section" aria-label="Side-by-side search race">
+    <div className="race-heading"><div><span className="section-kicker" data-testid="race-eyebrow">THE SEARCH RACE</span><h2 data-testid="tree-heading">Same problem. Two different paths.</h2></div><span className="race-status" data-testid="race-status"><i className={playing || busy ? 'running-dot' : ''}/>{busy ? 'Live computation' : legacy ? 'Saved snapshot' : playing ? 'Replaying measured visits' : finished ? 'Search replay complete' : run ? 'Replay paused' : 'Ready to explore'}</span></div>
+    <div className="race-board"><div className="race-panels">{(['fifo', 'lc'] as const).map(strategy => {
+      const result = run?.[strategy];
+      const frame = run ? atVisit(strategy === 'fifo' ? fifoFrames : lcFrames, tick) : live[strategy] || emptyFrame;
+      const nodes = result?.trace || live[strategy]?.trace || [];
+      const done = !!result && frame.visited >= result.visited;
+      return <div className={`race-panel race-${strategy}`} key={strategy} data-testid={`${strategy}-race-panel`}>
+        <div className="race-panel-header"><div><div className="algorithm-name"><span className="algorithm-mark"><GitBranch size={15}/></span><h3 data-testid={`${strategy}-strategy-label`}>{strategy.toUpperCase()}</h3><span>{strategy === 'fifo' ? 'First in, first out' : 'Highest bound first'}</span></div><span className="algorithm-status" data-testid={`${strategy}-race-state`}>{done ? (result?.proven_optimal ? <><Check size={12}/>Optimality proven</> : 'Limit reached · not proven') : frame.visited ? 'Exploring the frontier' : 'Awaiting first visit'}</span></div><div className="race-counter"><strong data-testid={`${strategy}-node-count`}>{number(frame.visited)}</strong><span>nodes visited</span></div></div>
+        <TreeGraphic key={`${run?.id || 'live'}-${strategy}`} strategy={strategy} nodes={nodes} currentOrder={frame.visited} complete={done} busy={busy}/>
+        <div className="race-panel-footer"><span>Pruned <b data-testid={`${strategy}-pruned-live`}>{number(frame.pruned)}</b></span><span>Frontier <b data-testid={`${strategy}-frontier-live`}>{number(frame.frontier)}</b></span><span>Best value <b data-testid={`${strategy}-best-live`}>{number(frame.best_score)}</b></span>{result && <span className="compute-time" data-testid={`${strategy}-compute-time`}>{result.elapsed_ms.toFixed(2)} ms compute</span>}</div>
+      </div>;
+    })}</div>
+    <fieldset className="race-controls" disabled={legacy}><div className="race-transport"><button className="icon-button" data-testid="replay-reset-button" title="Restart from the root" aria-label="Reset replay" disabled={!run} onClick={() => go(0)}><RotateCcw size={16}/></button><button className="race-play" data-testid="replay-play-button" aria-label={playing ? 'Pause replay' : 'Play replay'} disabled={!run} onClick={() => { if (finished) setStep(0); setPlaying(!playing); }}>{playing ? <Pause size={15}/> : <Play size={15}/>}<span>{playing ? 'Pause' : 'Play'}</span></button><button className="icon-button" data-testid="replay-step-button" title="Next measured step" aria-label="Next measured step" disabled={!run || finished} onClick={() => go(step + 1)}><StepForward size={17}/></button><button className="icon-button" data-testid="replay-end-button" title="Jump to result" aria-label="Jump to result" disabled={!run || finished} onClick={() => go(timeline.length - 1)}><SkipForward size={17}/></button></div><input data-testid="replay-slider" className="race-timeline" aria-label="Race timeline" type="range" min="0" max={Math.max(1, timeline.length - 1)} value={step} disabled={!run} onChange={e => go(+e.target.value)}/><span className="race-position" data-testid="replay-step-count">Visit <b>{number(tick)}</b><span> / {number(timeline[timeline.length - 1] || 0)}</span></span><select data-testid="replay-speed-select" aria-label="Replay speed" value={speed} onChange={e => setSpeed(+e.target.value)}><option value={220}>0.5×</option><option value={110}>1×</option><option value={55}>2×</option></select></fieldset>
     </div>
-    <div className="trace-caption"><span data-testid="trace-subset-disclaimer"><Info size={13}/>At most 30 nodes per strategy. Highlighting and replay show only the rendered subset.</span>{result && <span data-testid="trace-omitted-count">{number(result.trace_omitted)} nodes collapsed · {number(result.visited)} total visited · {number(result.pruned)} pruned</span>}</div>
+    <div className="race-footnotes"><div className="tree-legend" data-testid="race-legend"><span><i className="legend-explored"/>Explored</span><span><i className="legend-optimal"/>Selected path</span><span><i className="legend-pruned"/>Pruned</span></div><p data-testid="trace-subset-disclaimer"><Info size={12}/>{legacy ? 'This older snapshot has no detailed progress. Recalculate to enable the race.' : `Visit-synchronized replay, not wall-clock speed. First 30 generated nodes per tree; counters include all work.${hasBatching ? ' Long searches use batched steps.' : ''}`}</p></div>
+    <div className="race-disclosure" data-testid="trace-omitted-count">{run ? `FIFO: ${number(run.fifo.trace_omitted)} nodes collapsed · LC: ${number(run.lc.trace_omitted)} nodes collapsed` : 'Both searches use the same item ordering and upper bound.'}<span data-testid="measurement-disclaimer">LC is not guaranteed to visit fewer nodes.</span></div>
   </section>;
 };

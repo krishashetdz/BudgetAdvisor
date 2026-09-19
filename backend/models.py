@@ -48,6 +48,26 @@ class TraceNode(BaseModel):
     on_solution: bool = False
 
 
+class SearchFrame(BaseModel):
+    visited: int
+    pruned: int
+    best_score: float
+    frontier: int
+    generated: int
+
+
+class DPResult(BaseModel):
+    total_score: float
+    total_cost: float
+    selected_ids: list[str]
+    states_explored: int
+    retained_states: int
+    items_completed: int
+    elapsed_ms: float
+    proven_optimal: bool
+    stop_reason: str | None = None
+
+
 class SolverResult(BaseModel):
     strategy: str
     selected_ids: list[str]
@@ -66,6 +86,7 @@ class SolverResult(BaseModel):
     stop_reason: str | None
     trace: list[TraceNode]
     trace_omitted: int
+    progress: list[SearchFrame] = Field(default_factory=list)
 
 
 class Run(BaseModel):
@@ -78,6 +99,7 @@ class Run(BaseModel):
     lc: SolverResult
     recommended_strategy: str
     comparison_complete: bool
+    dp: DPResult | None = None
 
 
 class Dataset(BaseModel):

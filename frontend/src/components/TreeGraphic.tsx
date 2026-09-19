@@ -1,26 +1,51 @@
-import { useMemo } from 'react';
-import { TraceNode, number } from '../types';
-interface Props { nodes: TraceNode[]; currentOrder: number; onFocus: (node: TraceNode) => void; focusedId?: number }
-export const TreeGraphic = ({ nodes, currentOrder, onFocus, focusedId }: Props) => {
+import { useMemo, useState } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
+import { GitFork, X } from 'lucide-react';
+import { TraceNode, number, money } from '../types';
+interface Props { strategy: string; nodes: TraceNode[]; currentOrder: number; complete: boolean; busy: boolean }
+export const TreeGraphic = ({ strategy, nodes, currentOrder, complete, busy }: Props) => {
+  const [hovered, setHovered] = useState<{ node: TraceNode; x: number; y: number } | null>(null);
+  const reduced = useReducedMotion();
   const layout = useMemo(() => {
     const positions = new Map<number, { x: number; y: number }>();
     const children = new Map<number, TraceNode[]>();
     nodes.forEach(n => { if (n.parent !== null) children.set(n.parent, [...(children.get(n.parent) || []), n]); });
     let leaf = 0;
+    const depth = Math.max(...nodes.map(n => n.depth), 1);
     function place(n: TraceNode): number {
-      const kids = children.get(n.id) || [];
-      const xs = kids.map(place);
+      const xs = (children.get(n.id) || []).map(place);
       const x = xs.length ? (xs[0] + xs[xs.length - 1]) / 2 : leaf++;
-      positions.set(n.id, { x, y: 36 + n.depth * 66 }); return x;
+      positions.set(n.id, { x, y: 30 + n.depth * 270 / depth }); return x;
     }
     if (nodes[0]) place(nodes[0]);
-    positions.forEach(p => { p.x = leaf <= 1 ? 520 : 45 + p.x * 950 / (leaf - 1); });
-    return { positions, height: Math.max(245, 110 + Math.max(...nodes.map(n => n.depth), 0) * 66) };
+    positions.forEach(p => { p.x = leaf <= 1 ? 300 : 27 + p.x * 546 / (leaf - 1); });
+    return positions;
   }, [nodes]);
-  return <svg className="tree-svg" data-testid="search-tree-svg" viewBox={`0 0 1040 ${layout.height}`} role="img" aria-label="Bounded branch and bound decision tree">
-    {nodes.map(n => { const p = layout.positions.get(n.id)!; const parent = n.parent === null ? null : layout.positions.get(n.parent); const active = n.visit_order !== null && n.visit_order <= currentOrder; return parent && <g key={`edge-${n.id}`}><path d={`M${parent.x} ${parent.y + 15} C${parent.x} ${p.y - 28}, ${p.x} ${parent.y + 35}, ${p.x} ${p.y - 15}`} stroke={active && n.on_solution ? '#4f8175' : '#d8deda'} strokeWidth={active && n.on_solution ? 2.2 : 1.5} fill="none" strokeDasharray={n.decision === 'exclude' ? '4 4' : undefined}/><text className="branch-label" x={(parent.x + p.x) / 2 + (n.decision === 'include' ? -7 : 7)} y={(parent.y + p.y) / 2 + 1} textAnchor="middle" fill="#8b9690" fontSize="10">{n.decision === 'include' ? '+' : '−'}</text></g>; })}
-    {nodes.map(n => { const p = layout.positions.get(n.id)!; const active = n.visit_order !== null && n.visit_order <= currentOrder; const pruned = n.status.startsWith('pruned'); const fill = !active ? '#f6f7f4' : n.on_solution ? '#4f8175' : pruned ? '#f8ebdc' : '#e9eeeb'; const stroke = focusedId === n.id ? '#d89b43' : !active ? '#cfd8d2' : n.on_solution ? '#4f8175' : pruned ? '#d7af77' : '#bdcbc2'; return <g key={n.id} className="tree-node" data-testid={`tree-node-${n.id}`} role="button" tabIndex={0} aria-label={`Node ${n.id}, ${n.decision}, score ${n.score}, bound ${n.bound ?? 'infeasible'}`} onClick={() => onFocus(n)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onFocus(n); } }}>
-      <title>{`${n.decision} ${n.item_name || 'root'} · score ${n.score} · bound ${n.bound ?? 'infeasible'} · ${active ? n.status : 'frontier'}`}</title><circle cx={p.x} cy={p.y} r={16} fill={fill} stroke={stroke} strokeWidth={focusedId === n.id ? 3 : 1.5}/><text x={p.x} y={p.y + 4} textAnchor="middle" fontSize="11" fontWeight="600" fill={active && n.on_solution ? '#fff' : '#65756c'}>{n.id}</text><text className="node-bound-label" x={p.x} y={p.y + 32} textAnchor="middle" fontSize="10" fill="#7f8b84">{n.bound === null ? 'over budget' : `b: ${number(n.bound)}`}</text>{n.hidden_children > 0 && <g data-testid={`collapsed-branch-${n.id}`}><path d={`M${p.x} ${p.y + 36} v8`} stroke="#bec9c1" strokeDasharray="2 2"/><text x={p.x} y={p.y + 56} textAnchor="middle" fontSize="10" fill="#a47a3d">+{n.hidden_children} branches</text></g>}
-    </g>; })}
-  </svg>;
+  const visited = nodes.filter(n => n.visit_order !== null && n.visit_order <= currentOrder);
+  const show = (node: TraceNode, e: React.MouseEvent<SVGGElement> | React.FocusEvent<SVGGElement>) => {
+    const element = e.currentTarget, frame = element.closest('.race-canvas')!.getBoundingClientRect();
+    const rect = element.getBoundingClientRect();
+    setHovered({ node, x: Math.max(8, Math.min(frame.width - 216, rect.x - frame.x - 94)), y: Math.max(8, rect.y - frame.y - 116) });
+  };
+  return <div className="race-canvas" data-testid={`${strategy}-tree-canvas`} onMouseLeave={() => setHovered(null)}>
+    {!visited.length && <div className="race-empty" data-testid={`${strategy}-tree-empty`}><GitFork size={22}/><span>{busy ? 'Receiving search events' : nodes.length ? 'Start at the root' : 'No search yet'}</span></div>}
+    <svg className="race-tree-svg" data-testid={`${strategy}-search-tree-svg`} viewBox="0 0 600 344" role="img" aria-label={`${strategy.toUpperCase()} decision tree`}>
+      {visited.map(n => {
+        const p = layout.get(n.id)!; const parent = n.parent === null ? null : layout.get(n.parent);
+        const pruned = n.status.startsWith('pruned');
+        return parent && <motion.path key={`edge-${n.id}`} initial={reduced ? false : { opacity: 0 }} animate={{ opacity: pruned ? .45 : 1 }} transition={{ duration: .22 }} d={`M${parent.x} ${parent.y + 11} C${parent.x} ${(parent.y + p.y) / 2},${p.x} ${(parent.y + p.y) / 2},${p.x} ${p.y - 11}`} className={`race-edge ${complete && n.on_solution ? 'solution-edge' : ''}`} fill="none" strokeDasharray={n.decision === 'exclude' ? '3 3' : undefined}/>;
+      })}
+      {visited.map(n => {
+        const p = layout.get(n.id)!; const pruned = n.status.startsWith('pruned');
+        const state = pruned ? 'pruned-node' : complete && n.on_solution ? 'solution-node' : 'explored-node';
+        return <g key={n.id} transform={`translate(${p.x},${p.y})`}>
+          <motion.g className={`race-node ${state} ${n.visit_order === currentOrder && !complete ? 'current-node' : ''}`} initial={reduced ? false : { opacity: 0, scale: .55 }} animate={{ opacity: pruned ? .52 : 1, scale: 1 }} transition={{ duration: .2, ease: 'easeOut' }} data-testid={`${strategy}-tree-node-${n.id}`} role="button" tabIndex={0} aria-label={`Node ${n.id}, ${n.decision}, value ${n.score}, bound ${n.bound ?? 'infeasible'}`} onMouseEnter={e => show(n, e)} onFocus={e => show(n, e)} onBlur={() => setHovered(null)} onClick={e => show(n, e)} onKeyDown={e => { if (e.key === 'Escape') setHovered(null); }}>
+            <circle r="12"/><text y="3.5" textAnchor="middle">{n.id}</text>
+            {n.hidden_children > 0 && <g data-testid={`${strategy}-collapsed-branch-${n.id}`} className="collapsed-marker"><path d="M0 14 v8"/><text y="31" textAnchor="middle" children={`+${n.hidden_children}`}/></g>}
+          </motion.g>
+        </g>;
+      })}
+    </svg>
+    {hovered && hovered.node.visit_order !== null && hovered.node.visit_order <= currentOrder && <div className="node-tooltip" role="tooltip" data-testid={`${strategy}-node-tooltip`} style={{ left: hovered.x, top: hovered.y }}><div><strong data-testid={`${strategy}-tooltip-title`}>{hovered.node.decision === 'root' ? 'Root node' : `${hovered.node.decision === 'include' ? 'Include' : 'Exclude'} · #${hovered.node.id}`}</strong><button aria-label="Close node details" data-testid={`${strategy}-tooltip-close`} onClick={() => setHovered(null)}><X size={12}/></button></div>{hovered.node.item_name && <p>{hovered.node.item_name}</p>}<dl><div><dt>Value</dt><dd data-testid={`${strategy}-tooltip-value`}>{number(hovered.node.score)}</dd></div><div><dt>Bound</dt><dd data-testid={`${strategy}-tooltip-bound`}>{hovered.node.bound === null ? 'Infeasible' : number(hovered.node.bound)}</dd></div><div><dt>Cost</dt><dd>{money(hovered.node.cost)}</dd></div></dl><span>{hovered.node.status.replaceAll('_', ' ')}</span></div>}
+  </div>;
 };

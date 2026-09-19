@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from fractions import Fraction
 import heapq
 from time import perf_counter
-from models import SolveRequest, SolverResult, TraceNode
+from models import SolveRequest, SolverResult, TraceNode, SearchFrame
 
 
 @dataclass(slots=True)
@@ -25,7 +25,7 @@ class Node:
     decision: str
 
 
-def solve(request: SolveRequest, strategy: str) -> SolverResult:
+def solve(request: SolveRequest, strategy: str, on_progress=None) -> SolverResult:
     if strategy not in ('fifo', 'lc'):
         raise ValueError('Unknown strategy')
     start = perf_counter()
@@ -54,6 +54,17 @@ def solve(request: SolveRequest, strategy: str) -> SolverResult:
     trace: dict[int, TraceNode] = {}
     best_score, best_cost, best_indices = 0, 0, ()
     generated, visited, bound_pruned, infeasible_pruned, expanded = 0, 0, 0, 0, 0
+    progress = []
+
+    def record():
+        frame = SearchFrame(visited=visited, pruned=bound_pruned + infeasible_pruned,
+                            best_score=best_score / 100, frontier=len(queue) if strategy == 'fifo' else len(heap),
+                            generated=generated)
+        if not progress or progress[-1].visited != visited:
+            progress.append(frame)
+        if on_progress:
+            on_progress({'type': 'progress', 'strategy': strategy, **frame.model_dump(),
+                         'trace': [t.model_dump() for t in trace.values()]})
 
     def push(node):
         nonlocal generated
@@ -107,6 +118,10 @@ def solve(request: SolveRequest, strategy: str) -> SolverResult:
         if node.id in trace:
             trace[node.id].status = status
             trace[node.id].visit_order = visited
+        # Every initial visit is retained; long searches are bounded/sampled.
+        # Every visible-node visit is preserved even beyond the sampling limit.
+        if visited <= 100 or visited % 250 == 0 or node.id in trace:
+            record()
 
     # Mark only rendered nodes whose decisions agree with the chosen solution.
     selected = set(best_indices)
@@ -117,6 +132,7 @@ def solve(request: SolveRequest, strategy: str) -> SolverResult:
             expected_take = items[t.depth - 1][0] in selected
             t.on_solution = trace[t.parent].on_solution and (t.decision == 'include') == expected_take
     remaining = len(queue) if strategy == 'fifo' else len(heap)
+    record()
     return SolverResult(
         strategy=strategy, selected_ids=[request.items[i].id for i in best_indices],
         total_cost=best_cost / 100, total_score=best_score / 100,
@@ -124,7 +140,7 @@ def solve(request: SolveRequest, strategy: str) -> SolverResult:
         pruned=bound_pruned + infeasible_pruned, bound_pruned=bound_pruned,
         infeasible_pruned=infeasible_pruned, expanded=expanded, frontier_remaining=remaining,
         elapsed_ms=round((perf_counter() - start) * 1000, 3), proven_optimal=remaining == 0,
-        stop_reason=stop_reason, trace=list(trace.values()), trace_omitted=generated - len(trace))
+        stop_reason=stop_reason, trace=list(trace.values()), trace_omitted=generated - len(trace), progress=progress)
 
 
 def solve_pair(request: SolveRequest):

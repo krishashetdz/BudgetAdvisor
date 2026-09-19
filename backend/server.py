@@ -1,19 +1,23 @@
 import asyncio
 import os
 import uuid
+import json
+import logging
+import threading
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.concurrency import run_in_threadpool
 from motor.motor_asyncio import AsyncIOMotorClient
 from starlette.middleware.cors import CORSMiddleware
 from models import Dataset, Run, SaveRequest, SolveRequest
 from samples import SAMPLES
 from solver import solve_pair
+from computation import compute_run
 
 load_dotenv(Path(__file__).parent / '.env')
 client = AsyncIOMotorClient(os.environ['MONGO_URL'])
@@ -72,17 +76,63 @@ async def compute(snapshot: SolveRequest):
     except asyncio.TimeoutError:
         raise HTTPException(429, 'Two searches are already running. Please try again shortly.')
     try:
-        fifo, lc, recommended = await run_in_threadpool(solve_pair, snapshot)
+        run = await run_in_threadpool(compute_run, snapshot)
     finally:
         slots.release()
     now = datetime.now(timezone.utc)
-    run = Run(id=str(uuid.uuid4()), title=f'{snapshot.mode.title()} · ₹{snapshot.budget:,.2f}',
-              created_at=now.isoformat(), snapshot=snapshot, fifo=fifo, lc=lc,
-              recommended_strategy=recommended, comparison_complete=fifo.proven_optimal and lc.proven_optimal)
     document = run.model_dump(mode='json')
     document['expires_at'] = now + timedelta(days=1)
     await db.runs.insert_one(document)
     return run
+
+
+@app.post('/api/solve/stream')
+async def stream_compute(snapshot: SolveRequest):
+    try:
+        await asyncio.wait_for(slots.acquire(), timeout=0.05)
+    except asyncio.TimeoutError:
+        raise HTTPException(429, 'Two searches are already running. Please try again shortly.')
+    queue = asyncio.Queue()
+    loop = asyncio.get_running_loop()
+    disconnected = threading.Event()
+
+    def progress(event):
+        if disconnected.is_set():
+            raise RuntimeError('Search cancelled by client')
+        loop.call_soon_threadsafe(queue.put_nowait, event)
+
+    async def produce():
+        try:
+            run = await run_in_threadpool(compute_run, snapshot, progress)
+            if not disconnected.is_set():
+                doc = run.model_dump(mode='json')
+                doc['expires_at'] = datetime.now(timezone.utc) + timedelta(days=1)
+                await db.runs.insert_one(doc)
+                await queue.put({'type': 'complete', 'run': run.model_dump(mode='json')})
+        except Exception:
+            if not disconnected.is_set():
+                logging.exception('Streaming computation failed')
+                await queue.put({'type': 'error', 'message': 'The search could not finish. Please try again.'})
+        finally:
+            slots.release()
+            await queue.put(None)
+
+    task = asyncio.create_task(produce())
+    async def events():
+        try:
+            yield json.dumps({'type': 'started'}) + '\n'
+            while True:
+                event = await queue.get()
+                if event is None:
+                    break
+                yield json.dumps(event, allow_nan=False) + '\n'
+        finally:
+            disconnected.set()
+            # Keep a reference until completion; producer releases the slot.
+            if task.done():
+                task.result()
+    return StreamingResponse(events(), media_type='application/x-ndjson',
+                             headers={'X-Accel-Buffering': 'no', 'Cache-Control': 'no-cache'})
 
 
 @app.get('/api/runs', response_model=list[Run])
