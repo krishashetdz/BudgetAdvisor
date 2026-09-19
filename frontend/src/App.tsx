@@ -7,6 +7,7 @@ import Dashboard from './pages/Dashboard';
 import SavedRuns from './pages/SavedRuns';
 import Method from './pages/Method';
 import './App.css';
+import './selection.css';
 
 export default function App() {
   const workspace = useWorkspace();

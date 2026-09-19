@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import { api, errorMessage } from '../api';
 import { Dataset, Item, Mode, Run, Snapshot, LiveProgress } from '../types';
 import { streamSearch } from '../stream';
+import { useDraftHistory } from './useDraftHistory';
 
 const precision = (s: string) => /^-?\d+(\.\d{0,2})?$/.test(s);
 export function validate(data: Dataset): string | null {
@@ -23,7 +24,9 @@ export function validate(data: Dataset): string | null {
 
 export function useWorkspace() {
   const [mode, setMode] = useState<Mode>('shopping');
-  const [datasets, setDatasets] = useState<Record<Mode, Dataset> | null>(null);
+  const history = useDraftHistory();
+  const { seed, autoSelect } = history;
+  const draft = history.state?.[mode].present;
   const samples = useRef<Record<Mode, Dataset> | null>(null);
   const [run, setRun] = useState<Run | null>(null);
   const [busy, setBusy] = useState(false);
@@ -34,6 +37,7 @@ export function useWorkspace() {
   const controller = useRef<AbortController | null>(null);
   const version = useRef(0);
   const initialized = useRef(false);
+  const editGroup = useRef<string | null>(null);
 
   const compute = useCallback(async (data: Dataset, limit = 50000) => {
     const validation = validate(data);
@@ -47,42 +51,77 @@ export function useWorkspace() {
       const response = await streamSearch(snapshot, abort.signal, event => {
         if (version.current === requestVersion) setLive(prev => ({ ...prev, [event.strategy]: event }));
       });
-      if (version.current === requestVersion) setRun(response);
+      if (version.current === requestVersion) {
+        setRun(response);
+        autoSelect(data.mode, response[response.recommended_strategy].selected_ids);
+      }
     } catch (e) { if (version.current === requestVersion && !abort.signal.aborted) setError(e instanceof Error ? e.message : errorMessage(e)); }
     finally { if (version.current === requestVersion) setBusy(false); }
-  }, []);
+  }, [autoSelect]);
 
   const initialize = useCallback(async () => {
     setLoading(true); setError(null);
     try {
       const { data } = await api.get<Dataset[]>('/datasets');
       const all = Object.fromEntries(data.map(d => [d.mode, d])) as Record<Mode, Dataset>;
-      samples.current = all; setDatasets(all); setLoading(false);
+      samples.current = all; seed(all); setLoading(false);
       await compute(all.shopping);
     } catch (e) { setError(errorMessage(e)); setLoading(false); }
-  }, [compute]);
+  }, [compute, seed]);
   useEffect(() => { if (!initialized.current) { initialized.current = true; void initialize(); } }, [initialize]);
 
   const invalidate = () => { version.current++; controller.current?.abort(); setRun(null); setBusy(false); setError(null); setLive({}); };
   const edit = (patch: Partial<Dataset>) => {
     invalidate();
-    setDatasets(prev => prev ? { ...prev, [mode]: { ...prev[mode], ...patch } } : prev);
+    history.change(mode, current => ({ ...current, data: { ...current.data, ...patch } }), editGroup.current);
   };
   const updateItem = (id: string, key: keyof Item, value: string) => {
-    if (datasets) edit({ items: datasets[mode].items.map(i => i.id === id ? { ...i, [key]: value } : i) });
+    invalidate();
+    history.change(mode, current => ({ ...current, data: { ...current.data,
+      items: current.data.items.map(i => i.id === id ? { ...i, [key]: value } : i) } }), editGroup.current);
   };
-  const switchMode = (next: Mode) => { if (next !== mode) { invalidate(); setMode(next); } };
+  const beginEdit = (key: string) => { history.navigate(mode, 'end-group'); editGroup.current = key; };
+  const endEdit = () => { editGroup.current = null; history.navigate(mode, 'end-group'); };
+  const toggleItem = (id: string) => history.change(mode, current => ({ ...current,
+    selectedIds: current.selectedIds.includes(id) ? current.selectedIds.filter(i => i !== id) : [...current.selectedIds, id],
+    followsRecommendation: false }));
+  const selectAll = (checked: boolean) => history.change(mode, current => ({ ...current,
+    selectedIds: checked ? current.data.items.map(i => i.id) : [], followsRecommendation: false }));
+  const applyRecommendation = () => {
+    if (run) history.change(mode, current => ({ ...current, selectedIds: [...run[run.recommended_strategy].selected_ids], followsRecommendation: true }));
+  };
+  const navigateHistory = (direction: 'undo' | 'redo') => {
+    const h = history.state?.[mode];
+    const entries = direction === 'undo' ? h?.past : h?.future;
+    const next = entries?.[entries.length - 1];
+    if (!h || !next) return;
+    editGroup.current = null;
+    if (JSON.stringify(next.data) !== JSON.stringify(h.present.data)) invalidate();
+    history.navigate(mode, direction);
+  };
+  const switchMode = (next: Mode) => { if (next !== mode) { endEdit(); invalidate(); setMode(next); } };
   const restore = (saved: Run) => {
-    invalidate(); setMode(saved.snapshot.mode); setMaxNodes(saved.snapshot.max_nodes);
-    setDatasets(prev => prev ? { ...prev, [saved.snapshot.mode]: saved.snapshot } : prev);
-    setRun(saved); toast.success('Saved run restored');
+    invalidate(); editGroup.current = null; setMode(saved.snapshot.mode); setMaxNodes(saved.snapshot.max_nodes);
+    history.restore(saved.snapshot.mode, { data: saved.snapshot,
+      selectedIds: [...saved[saved.recommended_strategy].selected_ids], followsRecommendation: true });
+    setRun(saved); toast.success('Saved algorithm run restored');
   };
-  return { mode, datasets, data: datasets?.[mode], run,
+  const h = history.state?.[mode];
+  return { mode, data: draft?.data, run,
     setRun: (saved: Run) => setRun(current => current?.id === saved.id ? saved : current),
     busy, loading, error, maxNodes, live,
-    compute: () => datasets && compute(datasets[mode], maxNodes), initialize, edit, updateItem, switchMode, restore,
+    selectedIds: draft?.selectedIds || [], toggleItem, selectAll, applyRecommendation,
+    canUndo: !!h?.past.length, canRedo: !!h?.future.length,
+    undo: () => navigateHistory('undo'), redo: () => navigateHistory('redo'), beginEdit, endEdit,
+    compute: () => draft && compute(draft.data, maxNodes), initialize, edit, updateItem, switchMode, restore,
     setLimit: (limit: number) => { invalidate(); setMaxNodes(limit); },
-    reset: () => { if (samples.current) { edit(samples.current[mode]); toast.success('Sample dataset restored'); } },
+    reset: () => {
+      if (!samples.current) return;
+      invalidate(); editGroup.current = null;
+      const sample = samples.current[mode];
+      history.change(mode, () => ({ data: sample, selectedIds: [], followsRecommendation: true }));
+      toast.success('Sample dataset restored');
+    },
   };
 }
 export type Workspace = ReturnType<typeof useWorkspace>;

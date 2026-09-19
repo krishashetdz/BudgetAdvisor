@@ -138,3 +138,30 @@ Elevate the current application to a professional portfolio-grade product: disti
 - P1 optional: presentation-focused full-screen race view and exportable comparison/trace handout.
 - P1 optional: named edge-case presets for viva rehearsals.
 - P2: expected rupee-gain objective only after an explicit product decision; no silent change to additive educational scores.
+
+## Selection / Undo / over-budget fix — 2026-09-19
+
+### User report and confirmed behavior
+- Original report: “i cant edit like i cant choose other things nor cant undo other things fix it then it should show me that its over budget and all”.
+- User confirmed: “Click any item to select or deselect it, update totals immediately, show ‘Over budget by ₹…’ when needed, and add Undo/Redo. Keep algorithm recommendations separately labeled.”
+- Manual choices are NOT mandatory solver constraints. This extends the original read-only recommendation design: recommendations remain read-only badges/results, while new checkboxes edit a separate manual selection.
+
+### Root cause and implementation
+- Previous checkmarks were non-interactive spans representing solver output. There was no manual selection, edit history, or over-budget state; feasible algorithm outputs could never exceed the limit.
+- Added real native accessible per-row and select-all checkboxes, with independent manual selection for Shopping and Investment. Partial selection is reflected by an indeterminate header checkbox. Fields retain name/cost/score editability with clearer input borders.
+- Initial manual choices are seeded from the genuine recommendation. Once the user manually changes choices, a later or delayed computation never overwrites them. “Use recommendation” explicitly copies the solver’s selection and is undoable.
+- Added `useDraftHistory.ts`: mode-specific immutable draft history,100 bounded entries, Undo/Redo for select/deselect, clear/all, names/costs/scores/budget, add/delete, reset and recommendation application. A focused field edit is grouped into one undo step. A new change after Undo clears Redo. Input undo invalidates the algorithm result; selection-only undo preserves a still-valid result.
+- Item deletion removes orphan selected IDs; Undo restores the item with its fields and selected state. Mode switching preserves each mode’s independent edits, choices and history. Opening a saved algorithm run starts a fresh history for that mode and seeds choices from its result.
+- Added `manualSelection.ts`: exact integer-hundredths cost/score/budget arithmetic; safe handling for invalid inputs and zero budget; no NaN/Infinity/phantom fractional overspending.
+- Replaced the selection-side allocation area with a live “Your selection” summary, item count/value, clamped spent bar, remaining budget or semantic over-budget warning. Empty selection leaves the full budget. Changes update immediately without waiting for a solver or number animation.
+- Algorithm results remain independently labeled in the top metrics, recommendation badges and a separate comparison block. “Save algorithm run” and its dialog explicitly describe algorithm snapshots; manual choices/history remain workspace-session state, not persisted saved-run choices.
+- Added accessible Undo/Redo controls beside the item-list heading, clear selection and apply-recommendation actions. Preserved graphite/teal styling, using restrained error color only for actual overspending.
+- Resolved a stale dev typechecker module-resolution overlay by naming the fixed-point helper `manualSelection.ts`; fresh browser sessions show no build overlay.
+
+### Independent bug verification (required by user)
+- Testing agent report: `/app/test_reports/iteration_4.json`. Reported issue independently verified as no longer reproducible; no product/UI/design bugs found.
+- Exact reproduction: budget₹7500; algorithm recommends₹7000 /287points /4items. Select Wireless headphones: manual total₹10500 /377points /5items and **Over budget by ₹3000**, while algorithm result stays₹7000. Undo returns₹7000; Redo restores₹10500. Use recommendation restores the algorithm set; Undo returns the manual set.
+- Agent verified click and keyboard-Space selection, input editability, history grouping, manual preservation on rerun, mode-isolated history, input/proof invalidation, and0.10+0.20 versus0.30 without a false warning.
+- Desktop1920×800/mobile390×844 interactions and overflow checks passed.70/70 existing backend tests passed; no backend behavior changed.
+- Non-product observation: preview instrumentation report requests sometimes abort during automation; agent reproduced no user-facing effect or runtime overlay. No app changes needed for that telemetry observation.
+- No P0 remaining for this reported issue. Optional future work: persist named manual selections alongside algorithm runs, if requested.

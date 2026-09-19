@@ -16,3 +16,10 @@
 - Found and fixed an active-notification overflow when resizing desktop to390px; final toaster bounds left16/right374/width358, overflow empty. Neutral notification styling now matches the product palette.
 - Final screenshots: real browser at1920×800 and390×844. Both race layouts and active toast states verified without horizontal overflow; console error list empty.
 - All agreed flows functional. Race playback is explicitly paced by measured visit order, not advertised as a wall-clock benchmark. Actual compute progress is separately streamed.
+
+## Editable selections / Undo / over-budget — 2026-09-19
+- Mandatory independent bug-verification agent completed; report `/app/test_reports/iteration_4.json`.
+- User-reported selection/edit/undo problem not reproducible after implementation. Native checkboxes work by click and keyboard Space; manual totals update instantly; exact overspending is shown separately from valid algorithm recommendations.
+- Independently reproduced budget7500→algorithm7000→add headphones3500→manual10500 / overbudget3000. Undo/Redo and Use recommendation restored the correct combinations without altering the algorithm proof.
+- Agent verified edit history, preserved manual choices across recompute, independent modes, stale-proof invalidation and exact fractional arithmetic. Desktop/mobile reported flows passed;70/70 backend regression tests passed.
+- Product issues: none reported. Preview overlay telemetry request aborts observed in automation are non-user-path events with no visible build/runtime overlay or broken flow.
