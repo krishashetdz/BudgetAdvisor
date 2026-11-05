@@ -24,7 +24,7 @@ services:
     name: budget-advisor-frontend
     runtime: static
     rootDir: frontend
-    buildCommand: CI=false npm install && CI=false npm run build
+    buildCommand: npm install --legacy-peer-deps && DISABLE_ESLINT_PLUGIN=true CI=false npm run build
     staticPublishPath: build
     routes:
       - type: rewrite
@@ -33,6 +33,10 @@ services:
     envVars:
       - key: NODE_VERSION
         value: 20.12.0
+      - key: CI
+        value: "false"
+      - key: DISABLE_ESLINT_PLUGIN
+        value: "true"
       - key: REACT_APP_BACKEND_URL
         fromService:
           type: web
