@@ -20,8 +20,9 @@ services:
         value: "true"
 
   # Frontend React Static Site
-  - type: static_site
+  - type: web
     name: budget-advisor-frontend
+    runtime: static
     rootDir: frontend
     buildCommand: CI=false npm install && CI=false npm run build
     staticPublishPath: build
