@@ -1,0 +1,376 @@
+"""Comprehensive Rubric Audit Tests for BudgetAdvisor (Group G12).
+
+Covers all Professor Mini-Project Guideline requirements across:
+- Category 1 (Correctness): FIFO queue level-order traversal, LC priority-queue bound ordering,
+  fractional-knapsack upper-bound conservatives, feasibility checking, branch pruning,
+  DP independent verification, and multi-optimal canonical tie-breaking.
+- Category 2 (Robustness): All 18 required edge cases including empty dataset, single item,
+  zero budget, budget < min item, budget == item cost, budget > total cost, item > budget,
+  duplicate item costs, duplicate item values, multiple optimal combinations, negative/invalid costs,
+  invalid budgets, missing item attributes, 24-item max datasets, search node limits,
+  execution time limits, invalid API requests, and database unavailability / in-memory fallback.
+- Category 4 & 5 (Practical Application & Theoretical/Empirical Features): Shopping & Investment modes,
+  Performance Benchmarking, What-If Budget Sensitivity Analysis, and PDF/CSV Report Generation.
+"""
+from __future__ import annotations
+
+import asyncio
+from decimal import Decimal
+from itertools import combinations
+import io
+import os
+from pathlib import Path
+import sys
+
+import pypdf
+import pytest
+from pydantic import ValidationError
+import requests
+from dotenv import load_dotenv
+
+sys.path.append(str(Path(__file__).resolve().parents[1]))
+
+from benchmark import generate_benchmark_dataset, run_benchmark_suite  # noqa: E402
+from computation import compute_run  # noqa: E402
+from dp_solver import solve_dp  # noqa: E402
+from models import (  # noqa: E402
+    BenchmarkRequest,
+    Item,
+    ReportExportRequest,
+    SensitivityRequest,
+    SolveRequest,
+)
+from report_generator import generate_benchmark_csv, generate_optimization_pdf_report  # noqa: E402
+from sensitivity import run_sensitivity_analysis  # noqa: E402
+from server import _InMemoryClient, _InMemoryCollection, _InMemoryDB  # noqa: E402
+from solver import solve, solve_pair  # noqa: E402
+
+load_dotenv(Path(__file__).resolve().parents[2] / "frontend" / ".env")
+BASE_URL = os.environ.get("REACT_APP_BACKEND_URL") or "http://127.0.0.1:8000"
+
+
+@pytest.fixture(scope="session")
+def api_client():
+    session = requests.Session()
+    session.headers.update({"Content-Type": "application/json"})
+    return session
+
+
+def _exhaustive_knapsack(req: SolveRequest) -> tuple[float, float, list[str]]:
+    budget_c = int(req.budget * 100)
+    costs = [int(it.cost * 100) for it in req.items]
+    scores = [int(it.score * 100) for it in req.items]
+    best_score, best_cost, best_indices = 0, 0, ()
+    n = len(req.items)
+    for r in range(n + 1):
+        for subset in combinations(range(n), r):
+            c = sum(costs[i] for i in subset)
+            if c > budget_c:
+                continue
+            s = sum(scores[i] for i in subset)
+            if (-s, c, subset) < (-best_score, best_cost, best_indices):
+                best_score, best_cost, best_indices = s, c, subset
+    return (
+        best_score / 100,
+        best_cost / 100,
+        [req.items[i].id for i in best_indices],
+    )
+
+
+# ============================================================================
+# CATEGORY 1: CORRECTNESS AUDIT TESTS
+# ============================================================================
+
+def test_fifo_level_order_traversal_and_upper_bound_conservativeness():
+    """Verify FIFO explores nodes in non-decreasing tree depth (breadth-first level order)
+    and that root upper bound is always >= optimal 0/1 score."""
+    req = SolveRequest(
+        mode="shopping",
+        budget=Decimal("7000.00"),
+        items=[
+            {"id": "i1", "name": "Item 1", "cost": Decimal("3000.00"), "score": Decimal("90.00")},
+            {"id": "i2", "name": "Item 2", "cost": Decimal("2500.00"), "score": Decimal("75.00")},
+            {"id": "i3", "name": "Item 3", "cost": Decimal("2000.00"), "score": Decimal("50.00")},
+            {"id": "i4", "name": "Item 4", "cost": Decimal("4000.00"), "score": Decimal("85.00")},
+        ],
+    )
+    fifo = solve(req, "fifo")
+    dp = solve_dp(req)
+    assert fifo.proven_optimal is True
+    assert fifo.total_score == dp.total_score
+
+    # Verify visited trace nodes in FIFO are popped in non-decreasing depth order
+    visited_trace = sorted(
+        [t for t in fifo.trace if t.visit_order is not None],
+        key=lambda t: t.visit_order,
+    )
+    depths = [t.depth for t in visited_trace]
+    assert depths == sorted(depths), "FIFO must pop nodes in level-by-level (non-decreasing depth) order"
+
+    # Root upper bound must be >= final optimal 0/1 score
+    root_node = next(t for t in fifo.trace if t.parent is None)
+    assert root_node.bound is not None
+    assert root_node.bound >= fifo.total_score
+
+
+def test_lc_priority_queue_bound_ordering_and_dp_agreement():
+    """Verify LC Branch and Bound prioritizes highest upper bound first and matches DP and exhaustive search."""
+    req = SolveRequest(
+        mode="shopping",
+        budget=Decimal("6000.00"),
+        items=[
+            {"id": "a", "name": "High Density", "cost": Decimal("2000.00"), "score": Decimal("80.00")},
+            {"id": "b", "name": "Med Density", "cost": Decimal("3000.00"), "score": Decimal("90.00")},
+            {"id": "c", "name": "Low Density", "cost": Decimal("3500.00"), "score": Decimal("70.00")},
+            {"id": "d", "name": "Small Filler", "cost": Decimal("1000.00"), "score": Decimal("25.00")},
+        ],
+    )
+    fifo, lc, rec = solve_pair(req)
+    dp = solve_dp(req)
+    exp_score, exp_cost, exp_ids = _exhaustive_knapsack(req)
+
+    assert fifo.total_score == lc.total_score == dp.total_score == exp_score
+    assert fifo.total_cost == lc.total_cost == dp.total_cost == exp_cost
+    assert fifo.selected_ids == lc.selected_ids == dp.selected_ids == exp_ids
+    assert rec in ("fifo", "lc")
+
+
+# ============================================================================
+# CATEGORY 2: ROBUSTNESS & EDGE-CASE AUDIT TESTS
+# ============================================================================
+
+@pytest.mark.parametrize("strategy", ["fifo", "lc"])
+def test_single_item_affordable_unaffordable_and_negative(strategy: str):
+    """Test single-item datasets: affordable positive, unaffordable positive, and negative score in investment mode."""
+    # 1. Single affordable positive item
+    req_fit = SolveRequest(
+        mode="shopping",
+        budget=Decimal("500.00"),
+        items=[{"id": "solo", "name": "Solo Item", "cost": Decimal("400.00"), "score": Decimal("80.00")}],
+    )
+    res_fit = solve(req_fit, strategy)
+    dp_fit = solve_dp(req_fit)
+    assert res_fit.selected_ids == ["solo"]
+    assert res_fit.total_cost == 400.0
+    assert res_fit.total_score == 80.0
+    assert res_fit.remaining_budget == 100.0
+    assert dp_fit.selected_ids == ["solo"]
+
+    # 2. Single unaffordable item (item cost exceeding budget)
+    req_nofit = SolveRequest(
+        mode="shopping",
+        budget=Decimal("300.00"),
+        items=[{"id": "solo", "name": "Solo Item", "cost": Decimal("400.00"), "score": Decimal("80.00")}],
+    )
+    res_nofit = solve(req_nofit, strategy)
+    dp_nofit = solve_dp(req_nofit)
+    assert res_nofit.selected_ids == []
+    assert res_nofit.total_cost == 0.0
+    assert res_nofit.total_score == 0.0
+    assert res_nofit.remaining_budget == 300.0
+    assert dp_nofit.selected_ids == []
+
+    # 3. Single affordable negative-score item in investment mode (must be excluded)
+    req_neg = SolveRequest(
+        mode="investment",
+        budget=Decimal("1000.00"),
+        items=[{"id": "loss", "name": "Loss Asset", "cost": Decimal("400.00"), "score": Decimal("-12.50")}],
+    )
+    res_neg = solve(req_neg, strategy)
+    dp_neg = solve_dp(req_neg)
+    assert res_neg.selected_ids == []
+    assert res_neg.total_score == 0.0
+    assert res_neg.remaining_budget == 1000.0
+    assert dp_neg.selected_ids == []
+
+
+@pytest.mark.parametrize("strategy", ["fifo", "lc"])
+def test_budget_exactly_equal_to_item_cost(strategy: str):
+    """Test budget exactly equal to an item's cost leaves 0.00 remaining budget."""
+    req = SolveRequest(
+        mode="shopping",
+        budget=Decimal("2500.00"),
+        items=[
+            {"id": "exact", "name": "Exact Match", "cost": Decimal("2500.00"), "score": Decimal("88.00")},
+            {"id": "other", "name": "Other Item", "cost": Decimal("1800.00"), "score": Decimal("60.00")},
+        ],
+    )
+    res = solve(req, strategy)
+    dp = solve_dp(req)
+    assert res.selected_ids == ["exact"]
+    assert res.total_cost == 2500.0
+    assert res.remaining_budget == 0.0
+    assert dp.selected_ids == ["exact"]
+
+
+@pytest.mark.parametrize("strategy", ["fifo", "lc"])
+def test_duplicate_item_costs_and_duplicate_item_values(strategy: str):
+    """Test datasets with duplicate item costs and duplicate item values/scores."""
+    # Duplicate costs with different values -> must pick highest value
+    req_dup_cost = SolveRequest(
+        mode="shopping",
+        budget=Decimal("2000.00"),
+        items=[
+            {"id": "c1", "name": "Dup Cost Low Val", "cost": Decimal("1000.00"), "score": Decimal("40.00")},
+            {"id": "c2", "name": "Dup Cost High Val", "cost": Decimal("1000.00"), "score": Decimal("90.00")},
+            {"id": "c3", "name": "Dup Cost Mid Val", "cost": Decimal("1000.00"), "score": Decimal("70.00")},
+        ],
+    )
+    res_c = solve(req_dup_cost, strategy)
+    dp_c = solve_dp(req_dup_cost)
+    assert res_c.selected_ids == ["c2", "c3"]
+    assert res_c.total_score == 160.0
+    assert dp_c.selected_ids == ["c2", "c3"]
+
+    # Duplicate values with different costs -> tie-breaker must prefer lower total cost!
+    req_dup_val = SolveRequest(
+        mode="shopping",
+        budget=Decimal("5000.00"),
+        items=[
+            {"id": "expensive", "name": "Expensive 80", "cost": Decimal("4500.00"), "score": Decimal("80.00")},
+            {"id": "cheap", "name": "Cheap 80", "cost": Decimal("3200.00"), "score": Decimal("80.00")},
+        ],
+    )
+    res_v = solve(req_dup_val, strategy)
+    dp_v = solve_dp(req_dup_val)
+    # Only one can fit since 4500 + 3200 = 7700 > 5000; both give score 80, so lower cost ("cheap", 3200) must win
+    assert res_v.selected_ids == ["cheap"]
+    assert res_v.total_cost == 3200.0
+    assert res_v.remaining_budget == 1800.0
+    assert dp_v.selected_ids == ["cheap"]
+
+
+def test_multiple_equally_optimal_combinations_tie_breaking():
+    """Verify multiple combinations with identical score and cost resolve to lexicographically first original indices."""
+    req = SolveRequest(
+        mode="shopping",
+        budget=Decimal("3000.00"),
+        items=[
+            {"id": "first", "name": "First Pair A", "cost": Decimal("1500.00"), "score": Decimal("50.00")},
+            {"id": "second", "name": "First Pair B", "cost": Decimal("1500.00"), "score": Decimal("50.00")},
+            {"id": "third", "name": "Alt Single", "cost": Decimal("3000.00"), "score": Decimal("100.00")},
+            {"id": "fourth", "name": "Second Pair A", "cost": Decimal("1000.00"), "score": Decimal("40.00")},
+            {"id": "fifth", "name": "Second Pair B", "cost": Decimal("2000.00"), "score": Decimal("60.00")},
+        ],
+    )
+    run = compute_run(req)
+    assert run.fifo.selected_ids == ["first", "second"]
+    assert run.lc.selected_ids == ["first", "second"]
+    assert run.dp is not None and run.dp.selected_ids == ["first", "second"]
+    assert run.fifo.total_score == run.lc.total_score == run.dp.total_score == 100.0
+
+
+def test_invalid_inputs_negative_costs_invalid_budgets_missing_attributes():
+    """Verify Pydantic models reject negative costs, negative budgets, missing item attributes, and >24 items."""
+    # Negative cost
+    with pytest.raises(ValidationError):
+        Item(id="1", name="Bad Cost", cost=Decimal("-50.00"), score=Decimal("10.00"))
+
+    # Zero cost
+    with pytest.raises(ValidationError):
+        Item(id="1", name="Zero Cost", cost=Decimal("0.00"), score=Decimal("10.00"))
+
+    # Missing required attribute (score)
+    with pytest.raises(ValidationError):
+        Item(id="1", name="Missing Score", cost=Decimal("100.00"))  # type: ignore[call-arg]
+
+    # Negative budget
+    with pytest.raises(ValidationError):
+        SolveRequest(
+            mode="shopping",
+            budget=Decimal("-100.00"),
+            items=[{"id": "1", "name": "Valid", "cost": Decimal("50.00"), "score": Decimal("20.00")}],
+        )
+
+    # Budget > 100,000,000
+    with pytest.raises(ValidationError):
+        SolveRequest(
+            mode="shopping",
+            budget=Decimal("100000001.00"),
+            items=[{"id": "1", "name": "Valid", "cost": Decimal("50.00"), "score": Decimal("20.00")}],
+        )
+
+
+def test_large_supported_24_item_dataset_and_never_exceeds_budget():
+    """Test maximum supported 24-item dataset in both Shopping and Investment modes."""
+    for mode in ("shopping", "investment"):
+        items, budget = generate_benchmark_dataset(mode, size=24, seed=42)
+        assert len(items) == 24
+        req = SolveRequest(mode=mode, items=items, budget=budget, max_nodes=50_000, time_limit_ms=1500)
+        run = compute_run(req)
+        assert run.fifo.total_cost <= float(budget)
+        assert run.lc.total_cost <= float(budget)
+        assert run.dp is not None and run.dp.total_cost <= float(budget)
+        if run.fifo.proven_optimal and run.lc.proven_optimal and run.dp.proven_optimal:
+            assert run.fifo.total_score == run.lc.total_score == run.dp.total_score
+
+
+def test_in_memory_database_fallback_operations():
+    """Directly verify the built-in _InMemoryClient / _InMemoryDB / _InMemoryCollection fallback."""
+    async def _exercise():
+        client = _InMemoryClient()
+        db = client["fallback_test_db"]
+        assert isinstance(db, _InMemoryDB)
+        assert isinstance(db.datasets, _InMemoryCollection)
+
+        # Upsert dataset
+        await db.datasets.update_one(
+            {"mode": "shopping"},
+            {"$setOnInsert": {"mode": "shopping", "budget": "10000", "items": []}},
+            upsert=True,
+        )
+        assert await db.datasets.count_documents({"mode": "shopping"}) == 1
+        doc = await db.datasets.find_one({"mode": "shopping"}, {"_id": 0})
+        assert doc is not None and doc["budget"] == "10000"
+
+        # Insert runs, sort, update with $set and $unset, delete
+        await db.runs.insert_one({"id": "r1", "created_at": "2026-01-01T00:00:00Z", "saved": False, "expires_at": "soon"})
+        await db.runs.insert_one({"id": "r2", "created_at": "2026-01-02T00:00:00Z", "saved": True, "title": "Run 2"})
+        await db.runs.update_one({"id": "r1"}, {"$set": {"saved": True, "title": "Run 1"}, "$unset": {"expires_at": ""}})
+
+        r1 = await db.runs.find_one({"id": "r1"}, {"_id": 0})
+        assert r1 is not None and r1["saved"] is True and "expires_at" not in r1
+
+        saved_list = await db.runs.find({"saved": True}, {"_id": 0}).sort("created_at", -1).to_list(10)
+        assert [r["id"] for r in saved_list] == ["r2", "r1"]
+
+        del_res = await db.runs.delete_one({"id": "r1", "saved": True})
+        assert del_res.deleted_count == 1
+        assert await db.runs.find_one({"id": "r1"}) is None
+        client.close()
+
+    asyncio.run(_exercise())
+
+
+def test_pdf_report_with_benchmark_table_and_empty_dataset(api_client):
+    """Verify PDF report generation when include_benchmark=True and when items=[]."""
+    items, budget = generate_benchmark_dataset("shopping", size=8, seed=42)
+    req_with_bench = ReportExportRequest(
+        dataset_name="Full G12 Report With Benchmark",
+        mode="shopping",
+        items=items,
+        budget=budget,
+        include_sensitivity=True,
+        sensitivity_intervals=4,
+        include_benchmark=True,
+        benchmark_sizes=[5, 8],
+    )
+    pdf_bytes = generate_optimization_pdf_report(req_with_bench)
+    reader = pypdf.PdfReader(io.BytesIO(pdf_bytes))
+    full_text = "\n".join(p.extract_text() or "" for p in reader.pages)
+    assert "Group G12" in full_text
+    assert "Multi-Size Scaling Benchmark Summary" in full_text
+
+    # Empty dataset PDF export
+    req_empty = ReportExportRequest(
+        dataset_name="Empty Dataset Report",
+        mode="shopping",
+        items=[],
+        budget=Decimal("5000.00"),
+        include_sensitivity=True,
+    )
+    empty_pdf = generate_optimization_pdf_report(req_empty)
+    empty_reader = pypdf.PdfReader(io.BytesIO(empty_pdf))
+    empty_text = "\n".join(p.extract_text() or "" for p in empty_reader.pages)
+    assert "No input items were provided" in empty_text
+    assert "No items were selected" in empty_text

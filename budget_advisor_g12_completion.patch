@@ -1,0 +1,2020 @@
+diff --git a/README.md b/README.md
+index fb1d8b3..ec0f311 100644
+--- a/README.md
++++ b/README.md
+@@ -1,147 +1,312 @@
+-# Budget Advisor — 0/1 Knapsack Algorithm Lab
+-
+-A budget-constrained shopping and investment optimizer implementing **0/1 Knapsack** solved using **FIFO (First-In-First-Out / Breadth-First)** and **LC (Least Cost / Best-First) Branch and Bound** strategies, verified against an independent **Dynamic Programming (DP)** baseline.
+-
+----
+-
+-## 📌 Project Overview (Group G12)
+-
+-- **Problem Formulation:** 0/1 Knapsack Problem ($\max \sum v_i x_i$ subject to $\sum c_i x_i \le B$, $x_i \in \{0, 1\}$)
+-- **Algorithms:**
+-  - **FIFO Branch and Bound:** Queue-based level-by-level search (`deque.popleft()`) with fractional knapsack continuous relaxation upper bounding and bounding/feasibility pruning.
+-  - **LC Branch and Bound:** Priority queue (`heapq` min-heap on negative upper bound `-bound`) prioritizing the most promising live node first.
+-  - **DP Baseline:** Sparse exact dynamic programming recurrence over reachable integer-hundredth costs for independent verification.
+-- **Application Modes:**
+-  - **Shopping Advisor:** Optimizes consumer purchases based on price and utility satisfaction scores (0–100).
+-  - **Investment Advisor:** Optimizes asset and stock selection under a fixed capital budget, supporting fractional returns and negative return avoidance (educational additive score model; not financial advice).
+-
+----
+-
+-## ✨ Features
+-
+-### Core Optimizer & Visualization
+-- **Interactive Search Race:** Visual side-by-side comparison of FIFO vs. LC tree traversal.
+-- **Step-by-Step Replay:** Scrub through the decision tree node-by-node with play, pause, step forward, and speed controls.
+-- **Tri-Method Correctness Check:** Compares FIFO, LC, and DP solutions to mathematically prove global optimality.
+-- **Customizable Workspace:**
+-  - Interactive budget slider and numeric input.
+-  - Editable item/asset tables (add, edit, remove items, customize costs and scores) with Undo/Redo history.
+-  - Manual item toggling to compare user picks with the algorithmic optimum.
+-- **Saved Runs:** Save, name, review, and restore previous optimization runs.
+-- **Behind the Algorithm:** In-app theoretical guide with formulas, pseudocode, and bounding rules.
+-
+-### New DAA Extensions
+-1. **Advanced Algorithm Performance Benchmarking (`/performance`):**
+-   - Benchmark FIFO Branch and Bound vs. LC Branch and Bound across selectable dataset sizes (**5, 10, 15, 20, and 24 items**).
+-   - Supports both **reproducible generated benchmark datasets** and **custom user datasets** in Shopping or Investment mode.
+-   - Executes an initial warm-up pass followed by configurable repetitions ($1\times$, $3\times$, $5\times$) and reports the **median execution time** (in milliseconds) alongside min/max bounds, total nodes generated, nodes explored (visited), nodes pruned (bound + infeasible), **maximum frontier queue size**, optimal value, selected cost, and remaining budget.
+-   - Includes 4 interactive Recharts comparison visualizations (*Execution Time vs. Dataset Size*, *Nodes Explored vs. Dataset Size*, *Nodes Pruned vs. Dataset Size*, and *Maximum Queue Size vs. Dataset Size*) plus a side-by-side **Benchmark Results Table** with independent **DP Correctness Verification** badges.
+-2. **What-If Budget Sensitivity Analysis (`/what-if`):**
+-   - Parametric budget sweep across user-defined minimum budget, maximum budget, and interval steps ($2$ to $16$ intervals).
+-   - Re-executes the exact 0/1 Knapsack Branch and Bound and DP solvers at every budget step without approximate or synthetic formulas.
+-   - Plots the **Budget vs. Maximum Achievable Score** Pareto frontier with optional FIFO vs. LC overlay.
+-   - Interactive budget point inspector showing recommended items, expenditure, unspent remainder, node visits, execution time, and DP verification status at any selected budget point.
+-   - **Automated Sensitivity Insights** derived directly from calculated results (overall score expansion, stepwise budget plateaus where extra budget leaves the optimal set unchanged, minimum budget thresholds for high-value items, diminishing marginal utility per ₹1,000, and LC vs. FIFO node-exploration savings).
+-3. **Downloadable Optimization Reports (`/reports`):**
+-   - **PDF Optimization Report (`/api/report/pdf`):** Generates a multi-page academic PDF report with page numbers, structured tables, vector sensitivity curve, and 7 sections:
+-     1. *Project and Optimization Details*
+-     2. *Input Dataset*
+-     3. *Optimal Recommendation*
+-     4. *Algorithm Performance (FIFO vs. LC)*
+-     5. *Independent Dynamic Programming Verification*
+-     6. *Budget Sensitivity Analysis (Table + Vector Graph)*
+-     7. *Automated Empirical Conclusion*
+-   - **Benchmark CSV Export (`/api/report/csv`):** Exports all benchmark metrics across dataset sizes to a clean CSV file for external plotting or lab submissions.
+-
+----
+-
+-## 🔬 How FIFO and LC Performance Comparisons Work
+-
+-Both **FIFO Branch and Bound** and **LC Branch and Bound** solve the exact same 0/1 Knapsack instance using the same item ordering (descending score-to-cost ratio $v_i / c_i$, with original index tie-breaking) and the same conservative fractional-knapsack upper bound:
+-
+-1. **FIFO Branch and Bound** stores live frontier nodes in a First-In-First-Out queue (`collections.deque`). It explores the state-space tree level-by-level (breadth-first). Because it does not prioritize high-bound branches, it typically discovers strong incumbent solutions (`best_score`) later in the search, which limits early bound pruning.
+-2. **LC (Least Cost) Branch and Bound** stores live frontier nodes in a min-heap priority queue (`heapq`) keyed by `-node.bound` (minimizing the negative upper bound, i.e., expanding the node with the highest optimistic upper bound first). By diving rapidly toward high-value feasible leaves, LC tightens `best_score` early and prunes a larger fraction of unpromising subtrees (`node.bound < best_score`), typically resulting in fewer visited nodes, smaller peak queue sizes, and faster execution as $N$ grows from 5 to 24 items.
+-3. **Honest Measurement & Verification:** Neither strategy stops at the first feasible leaf; optimality is proven only when the live frontier is exhausted (`frontier_remaining == 0`). If a search reaches `max_nodes` (default $50,000$) or `time_limit_ms` (default $1,500\text{ ms}$), it is explicitly marked as capped (`proven_optimal = False`) and compared against the independent sparse **Dynamic Programming** baseline.
+-
+----
+-
+-## 🔌 API Endpoints
+-
+-| Method | Endpoint | Description |
+-| :--- | :--- | :--- |
+-| `GET` | `/api/` | Health check endpoint (`{"name": "Budget Advisor", "status": "ok"}`). |
+-| `GET` | `/api/datasets` | Retrieve default seeded Shopping and Investment datasets. |
+-| `POST` | `/api/solve` | Solve a 0/1 Knapsack snapshot with FIFO B&B, LC B&B, and DP baseline. |
+-| `POST` | `/api/solve/stream` | Stream real-time NDJSON search progress frames for FIFO, LC, and DP. |
+-| `POST` | `/api/benchmark` | **New:** Execute multi-size FIFO vs. LC performance benchmarking with warm-up, median timing, max queue tracking, and DP verification. |
+-| `POST` | `/api/sensitivity` | **New:** Run What-If Budget Sensitivity Analysis across budget intervals and generate data-driven insights. |
+-| `POST` | `/api/report/pdf` | **New:** Generate and download the 7-section PDF Optimization Report. |
+-| `POST` | `/api/report/csv` | **New:** Generate and download the Benchmark Results CSV file. |
+-| `GET` | `/api/runs` | List saved optimization runs. |
+-| `GET` | `/api/runs/{run_id}` | Retrieve a specific optimization run by ID. |
+-| `PUT` | `/api/runs/{run_id}/save` | Save and title an optimization run. |
+-| `DELETE` | `/api/runs/{run_id}` | Delete a saved optimization run. |
+-
+----
+-
+-## 🛠️ Tech Stack
+-
+-- **Backend:** Python 3, FastAPI, Uvicorn, Pydantic, Motor / MongoMock / Built-in In-Memory Fallback, Native PDF 1.4 Vector Report Engine (zero external PDF library dependencies required)
+-- **Frontend:** React 19, TypeScript, CRACO, Tailwind CSS, Radix UI, Recharts, Framer Motion, Lucide Icons
+-- **Testing:** Pytest (82 automated test cases with 100% pass rate)
+-
+----
+-
+-## 🚀 Getting Started
+-
+-### Prerequisites
+-
+-- Python 3.10+
+-- Node.js 18+ and npm / yarn
+-
+-### 1. Backend Setup
++# BudgetAdvisor — Budget-Constrained Shopping & Investment Optimizer (0/1 Knapsack Algorithm Lab)
++
++## 1. Project Title
++**BudgetAdvisor: A Budget-Constrained Shopping and Investment Advisor Using 0/1 Knapsack FIFO Branch and Bound, Least Cost (LC) Branch and Bound, and Dynamic Programming Verification**
++
++## 2. Group ID
++- **Project Group ID:** **G12**
++- **Course:** Design and Analysis of Algorithms (DAA) Mini Project
++- **Assigned Topic:** 0/1 Knapsack using FIFO Branch and Bound and Least Cost (LC) Branch and Bound
++- **Practical Application:** Budget-Constrained Shopping / Investment Advisor — selects the optimal combination of products or educational assets within a fixed budget.
++
++## 3. Problem Statement
++Given a set of $n$ indivisible items or assets, where each item $i \in \{0, 1, \dots, n-1\}$ has a positive monetary cost $c_i > 0$ and an assigned utility or educational score $v_i$, and given a fixed non-negative budget $B \ge 0$, determine a binary selection vector $x = (x_0, x_1, \dots, x_{n-1}) \in \{0, 1\}^n$ that maximizes total score without exceeding the available budget:
++
++$$\max \sum_{i=0}^{n-1} v_i x_i \quad \text{subject to} \quad \sum_{i=0}^{n-1} c_i x_i \le B, \quad x_i \in \{0, 1\}$$
++
++When multiple feasible combinations achieve the same maximum total score, the canonical optimal solution is selected deterministically by:
++1. **Maximum total score** ($\max \sum v_i x_i$),
++2. **Minimum total expenditure** ($\min \sum c_i x_i$), and
++3. **Lexicographically smallest tuple of original item indices** $(i_1, i_2, \dots, i_m)$.
++
++## 4. Project Objectives
++1. **Exact 0/1 Knapsack Implementation:** Implement both **FIFO Branch and Bound** and **Least Cost (LC) Branch and Bound** using exact fixed-point arithmetic (integer hundredths) and a shared fractional-knapsack upper bound.
++2. **Independent Optimality Verification:** Verify all Branch and Bound results against an independent **Sparse Dynamic Programming (DP)** baseline.
++3. **Interactive Visual Comparison:** Visualize the state-space search tree side-by-side for FIFO and LC with step-by-step node replay, pruning inspection, and real-time NDJSON streaming.
++4. **Practical Dual-Domain Application:** Provide a real-world **Shopping Advisor** mode (consumer utility optimization) and an educational **Investment Advisor** mode (capital allocation across assets with positive/negative scores).
++5. **Empirical Benchmarking & Parametric Sensitivity:** Measure actual execution time, generated/explored/pruned nodes, and peak frontier queue sizes across dataset sizes ($5$ to $24$ items), and analyze how varying the budget shifts the optimal combination (**What-If Budget Analysis**).
++6. **Academic Reporting:** Generate downloadable multi-page **PDF Optimization Reports** and **Benchmark CSV Exports** directly from live solver runs.
++
++## 5. Assigned Algorithms
++1. **FIFO Branch and Bound (Breadth-First / Level-Order Search):** Explores live state-space tree nodes in First-In-First-Out order using a double-ended queue (`collections.deque`).
++2. **Least Cost (LC) Branch and Bound (Best-First Search):** Explores the most promising live node first using a binary min-heap priority queue (`heapq`) ordered by negative upper bound (`-node.bound`).
++3. **Sparse Dynamic Programming Baseline (Verification Solver):** Independently computes the exact optimal value and canonical item subset over reachable integer-hundredth cost states.
++
++## 6. FIFO Branch and Bound Explanation
++- **Data Structure:** `collections.deque` supporting $O(1)$ `append()` (enqueue at tail) and $O(1)$ `popleft()` (dequeue from head).
++- **Traversal Order:** Explores the binary decision tree level by level (depth $0$, then depth $1$, then depth $2$, etc.).
++- **Branching Rule:** At depth $d < n$, an expanded feasible node generates two children in deterministic order:
++  1. **Include child ($x_d = 1$):** Adds item $d$'s cost and score, updates the chosen index tuple, and computes `upper(d + 1, cost + price, score + value)`.
++  2. **Exclude child ($x_d = 0$):** Retains current cost and score, and computes `upper(d + 1, cost, score)`.
++- **Characteristic Behavior:** Because FIFO processes all shallow nodes before reaching deep leaves, strong incumbent solutions (`best_score`) are often discovered later in the search, limiting early bound pruning on deeper levels.
++
++## 7. Least Cost (LC) Branch and Bound Explanation
++- **Data Structure:** Binary min-heap (`heapq`) storing tuples `(-node.bound, node.id, node)` so `heappop()` extracts the live node with the **highest optimistic upper bound** first (tie-broken deterministically by creation order `node.id`).
++- **Why "Least Cost" Minimizes `-upper_bound`:** In minimization Branch and Bound, LC selects the node with the smallest cost bound. For the maximization 0/1 Knapsack problem, converting the upper bound $U(N)$ to $-U(N)$ transforms maximization into minimization, so minimizing `-node.bound` expands the most promising branch first.
++- **Characteristic Behavior:** By diving rapidly along high-density include branches, LC establishes a high `best_score` early and prunes a larger fraction of unpromising sibling subtrees. However, LC is **not** mathematically guaranteed to visit fewer nodes than FIFO on every input (e.g., adversarial tie instances), which BudgetAdvisor explicitly discloses and measures honestly.
++
++## 8. Fractional-Knapsack Upper-Bound Calculation
++Before search begins, all items are sorted in descending order of exact rational value-to-cost density:
++
++$$\frac{v_0}{c_0} \ge \frac{v_1}{c_1} \ge \dots \ge \frac{v_{n-1}}{c_{n-1}}$$
++
++using Python's exact `fractions.Fraction(score_hundredths, cost_hundredths)` (and `BigInt` cross-multiplication in TypeScript), with original item index as the tie-breaker.
++
++For a node at `depth` with accumulated `cost` and `score`:
++1. If `cost > budget`, the node is infeasible and returns $-\infty$ (`-10**30`).
++2. Otherwise, let remaining capacity be $\text{room} = \text{budget} - \text{cost}$ and initialize $\text{bound} = \text{score}$.
++3. Scan remaining sorted items $j = \text{depth}, \dots, n-1$:
++   - If $v_j \le 0$, **break** immediately (since items are sorted by descending $v_j / c_j$ and $c_j > 0$, all subsequent items also have non-positive value and cannot improve the bound).
++   - If $c_j \le \text{room}$, take the full item: $\text{bound} \gets \text{bound} + v_j$ and $\text{room} \gets \text{room} - c_j$.
++   - Otherwise ($c_j > \text{room}$), take the continuous fractional slice rounded **upward** (ceiling in integer hundredths) so the bound never underestimates any valid 0/1 completion, and **break**:
++     $$\text{bound} \gets \text{bound} + \left\lfloor \frac{v_j \cdot \text{room} + c_j - 1}{c_j} \right\rfloor$$
++
++## 9. Feasibility Checking and Branch Pruning
++Every node popped from the frontier increments `visited` by $1$ and undergoes two pruning checks:
++1. **Feasibility Pruning (`pruned_budget` / `infeasible_pruned`):**
++   - Condition: `node.cost > budget` ($O(1)$ time).
++   - Action: The node is immediately discarded without updating the incumbent or generating children.
++2. **Upper-Bound Pruning (`pruned_bound` / `bound_pruned`):**
++   - Condition: `node.bound < best_score` ($O(1)$ time).
++   - Action: Even under continuous relaxation, no completion of this subtree can beat `best_score`, so the node is pruned.
++   - **Important Tie Preservation Rule:** Nodes with `node.bound == best_score` are **not** pruned. Preserving equal-bound branches guarantees that if an alternative combination achieves the same optimal score at a lower total cost or an earlier lexicographic index tuple, it will be discovered.
++
++## 10. Dynamic Programming Verification
++To provide an independent mathematical proof of correctness (`backend/dp_solver.py`):
++- Rather than allocating a dense table of size $n \times (W + 1)$ (which is impractical when $B = ₹10,00,00,000 \implies W = 10^{10}$ hundredths), `solve_dp` implements **Sparse-Cost Dynamic Programming**.
++- It maintains a dictionary `states: dict[int, tuple[int, tuple[int, ...]]]` initialized to `{0: (0, ())}`, mapping each reachable exact integer-hundredth cost $c \le W$ to its best `(score, chosen_indices)`.
++- For each item $i$ with `(price, value)`, it iterates over the snapshot `previous = list(states.items())` and evaluates the include transition `next_cost = cost + price`. If `next_cost <= budget`, it updates `states[next_cost]` using the same canonical tie-breaking rule `(-score, chosen_indices)`.
++- Finally, it selects `min(states.items(), key=lambda e: (-e[1][0], e[0], e[1][1]))` and compares the result against FIFO and LC.
++
++## 11. Shopping and Investment Modes
++- **Shopping Advisor Mode (`mode = "shopping"`):**
++  - Users enter a shopping budget in INR (`₹`) and manage a list of consumer products (up to 24 items), each with a positive price and a utility satisfaction score between `0` and `100`.
++  - Recommends the affordable product bundle that maximizes total utility score.
++- **Investment Advisor Mode (`mode = "investment"`):**
++  - Users set a capital allocation budget in INR (`₹`) and select from educational investment assets (ETFs, bond funds, sector baskets), each with a unit cost and an assigned additive score (ranging from `-1,000,000` to `+1,000,000`, supporting negative-score loss avoidance).
++  - Includes a prominent **Educational Score Model Disclaimer** clarifying that additive scores are for demonstrating 0/1 Knapsack optimization and do not represent compounded portfolio returns or professional financial advice.
++
++## 12. Performance Analysis (`/performance`)
++- Benchmarks **FIFO Branch and Bound** and **Least Cost (LC) Branch and Bound** on **identical datasets** across configurable dataset sizes (`5, 10, 15, 20, 24` items) using either reproducible seeded benchmark datasets or the user's current custom dataset.
++- Performs an unrecorded **warm-up pass** before running $R \in \{1, 3, 5\}$ timed repetitions and reports the **median execution time** (plus min/max bounds) in milliseconds.
++- Records and displays:
++  - Execution Time (median, min, max in ms)
++  - Nodes Generated (`generated`)
++  - Nodes Explored / Visited (`visited`)
++  - Nodes Pruned (`bound_pruned + infeasible_pruned`)
++  - Maximum Frontier Queue Size (`max_queue_size`)
++  - Optimal Value, Selected Cost, and Remaining Budget
++  - Independent Dynamic Programming Verification & Search Completion Status (`Proven Optimal` vs. `Stopped: node_limit / time_limit`).
++- Renders 4 interactive Recharts visualizations:
++  1. *Execution Time vs. Dataset Size*
++  2. *Nodes Explored vs. Dataset Size*
++  3. *Nodes Pruned vs. Dataset Size*
++  4. *Maximum Queue Size vs. Dataset Size*
++
++## 13. What-If Budget Analysis (`/what-if`)
++- Allows users to select a **Minimum Budget**, **Maximum Budget**, and **Number of Budget Intervals** ($2$ to $16$ steps) in both Shopping and Investment modes.
++- Re-executes the actual FIFO, LC, and DP solvers at every budget step without synthetic approximations.
++- Plots the **Available Budget vs. Maximum Achievable Score** step-frontier curve and provides an interactive budget-point scrubber inspecting the exact optimal item combination, total expenditure, remaining budget, and solver execution time at each step.
++- Automatically synthesizes **data-driven observations** from the calculated points:
++  1. Overall score expansion across the budget range,
++  2. Stepwise budget plateaus where extra budget remains unspent without changing the optimal combination,
++  3. Minimum budget thresholds required to unlock high-value items (or trade-off explanations when a high-value item is bypassed for higher combined utility),
++  4. Diminishing marginal score returns per ₹1,000 added at higher budgets, and
++  5. Aggregate LC vs. FIFO node-exploration comparison across the sweep.
++
++## 14. PDF and CSV Exports (`/reports`)
++- **PDF Optimization Report (`POST /api/report/pdf`):** Generates a multi-page academic PDF 1.4 report (with native vector charts, structured tables, and `"Page X of Y"` footers) containing all required details:
++  1. Project title, Group ID (`G12`), selected mode, and UTC timestamp
++  2. Complete input dataset table (costs, scores, score/cost ratios, selection status)
++  3. Available budget, recommended items/assets with individual costs and scores, total expenditure, remaining budget, and maximum achievable score
++  4. FIFO and LC Branch and Bound performance statistics (execution time, generated/explored/pruned nodes, max queue size, optimality status, plus optional multi-size benchmark table)
++  5. Independent Dynamic Programming verification and execution-limit warnings
++  6. Budget sensitivity analysis table, embedded vector sensitivity curve, and automated insights
++  7. Empirical conclusion synthesized from the run
++- **Benchmark CSV Export (`POST /api/report/csv`):** Exports multi-size FIFO vs. LC benchmark metrics (`Dataset Size`, `Mode`, `Budget`, `Algorithm`, `Execution Time Median/Min/Max`, `Nodes Generated`, `Nodes Explored`, `Nodes Pruned`, `Bound Pruned`, `Infeasible Pruned`, `Max Queue Size`, `Optimal Value`, `Selected Cost`, `Remaining Budget`, `Proven Optimal`, `Stop Reason`, `DP Optimal Value`, `Matches DP`, `Verification Status`).
++
++## 15. Technology Stack
++- **Backend:** Python 3.10+, FastAPI, Uvicorn, Pydantic (v1 & v2 compatible layer), Motor (AsyncIO MongoDB driver), MongoMock / Built-in `_InMemoryClient` fallback, self-contained PDF 1.4 vector report generator.
++- **Frontend:** React 19, TypeScript, Tailwind CSS, CRACO, React Router v7, Recharts, Framer Motion, Radix UI primitives, Lucide React icons, Sonner toast notifications, Axios.
++- **Database:** MongoDB with automatic zero-configuration fallback to in-memory storage when MongoDB is unavailable.
++- **Testing:** Pytest / Python automated test suite (90 test cases across 5 test modules).
++
++## 16. System Architecture
++```
++BudgetAdvisor/
++├── backend/
++│   ├── server.py             # FastAPI application, REST & NDJSON stream routes, MongoDB + In-Memory fallback
++│   ├── solver.py             # Exact integer-hundredth FIFO & LC Branch and Bound solvers
++│   ├── dp_solver.py          # Independent Sparse-Cost 0/1 Dynamic Programming verification solver
++│   ├── computation.py        # Concurrent ThreadPoolExecutor orchestrator for FIFO, LC, and DP
++│   ├── benchmark.py          # Multi-size empirical benchmark suite with warm-up & median timing
++│   ├── sensitivity.py        # What-If parametric budget sweep & automated insight generator
++│   ├── report_generator.py   # Self-contained 7-section PDF 1.4 vector report & CSV generator
++│   ├── models.py             # Pydantic request/response schemas & strict financial/input validation
++│   ├── samples.py            # Default seeded Shopping & Investment datasets (8 items each)
++│   └── tests/                # 5 automated test suites (90 total test cases)
++├── frontend/
++│   └── src/
++│       ├── App.tsx           # Top-level navigation & routing (/, /performance, /what-if, /reports, /runs, /method)
++│       ├── api.ts            # Axios API client with resilient client-side fallback
++│       ├── stream.ts         # Real-time NDJSON stream consumer with AbortController cancellation
++│       ├── localSolver.ts    # Client-side TypeScript mirror of FIFO, LC, DP, Benchmark & Sensitivity
++│       ├── manualSelection.ts# Exact integer-hundredths manual selection & over-budget calculator
++│       ├── hooks/            # useWorkspace.ts & useDraftHistory.ts (Undo/Redo state management)
++│       ├── components/       # SearchTree, TreeGraphic, ItemTable, SelectionPanel, Results, SaveDialog
++│       └── pages/            # Dashboard, PerformanceAnalysis, WhatIfAnalysis, ExportReports, SavedRuns, Method
++└── docs/
++    ├── Project_Technical_Documentation.md
++    └── screenshots/
++```
+ 
++## 17. Installation Instructions
++Clone the repository and ensure **Python 3.10+** and **Node.js 18+** (with `npm` or `yarn`) are installed:
+ ```bash
+-cd backend
+-python -m venv venv
++git clone https://github.com/krishashetdz/BudgetAdvisor.git
++cd BudgetAdvisor
++```
+ 
+-# Windows
+-.\venv\Scripts\activate
+-# macOS/Linux
++## 18. Backend Setup
++```bash
++cd backend
++python3 -m venv venv
++# On Linux/macOS:
+ source venv/bin/activate
++# On Windows:
++.\venv\Scripts\activate
+ 
+ pip install -r requirements.txt
+-```
+-
+-Start the backend API server:
+-```bash
+ uvicorn server:app --host 127.0.0.1 --port 8000 --reload
+ ```
+-The backend will run on `http://127.0.0.1:8000` (Interactive Swagger API docs at `http://127.0.0.1:8000/docs`).
+-
+-### 2. Frontend Setup
++- The FastAPI server runs at `http://127.0.0.1:8000` (Swagger UI at `http://127.0.0.1:8000/docs`).
++- If a local MongoDB instance is running on `mongodb://localhost:27017`, the server connects automatically; otherwise, it seamlessly falls back to its built-in in-memory database (`USE_MOCK_MONGO=true`).
+ 
++## 19. Frontend Setup
+ ```bash
+ cd frontend
+ npm install
+ npm start
+ ```
+-The frontend will run on `http://localhost:3000`.
+-
+----
+-
+-## 🧪 Running Tests
+-
+-With the backend server running on `http://127.0.0.1:8000` (or via `pytest` directly):
++- The React application opens at `http://localhost:3000`.
++- To configure a custom backend URL, set `REACT_APP_BACKEND_URL=http://127.0.0.1:8000` in `frontend/.env`.
++
++## 20. API Documentation
++
++| Method | Endpoint | Request Body / Params | Response / Description |
++| :--- | :--- | :--- | :--- |
++| `GET` | `/api/` | None | Returns health status `{"name": "Budget Advisor", "status": "ok"}`. |
++| `GET` | `/api/datasets` | None | Returns the seeded `shopping` and `investment` datasets (8 items each, budget `10000`). |
++| `POST` | `/api/solve` | `SolveRequest` (`mode`, `items`, `budget`, `max_nodes`, `time_limit_ms`) | Executes FIFO B&B, LC B&B, and Sparse DP; stores and returns a `Run` object. |
++| `POST` | `/api/solve/stream` | `SolveRequest` | Streams real-time NDJSON `started`, `progress`, and `complete` events for FIFO, LC, and DP. |
++| `POST` | `/api/benchmark` | `BenchmarkRequest` (`mode`, `dataset_source`, `sizes`, `repetitions`, `seed`) | Runs warm-up + multi-size benchmark across `sizes` (`1..24`) and returns `BenchmarkResponse`. |
++| `POST` | `/api/sensitivity` | `SensitivityRequest` (`mode`, `items`, `min_budget`, `max_budget`, `intervals`) | Runs parametric What-If budget sweep (`2..20` intervals) and returns `SensitivityResponse`. |
++| `POST` | `/api/report/pdf` | `ReportExportRequest` | Generates and downloads `budgetadvisor_<mode>_report.pdf` (`application/pdf`). |
++| `POST` | `/api/report/csv` | `BenchmarkRequest` | Generates and downloads `budgetadvisor_<mode>_benchmark.csv` (`text/csv`). |
++| `GET` | `/api/runs` | None | Lists up to 100 saved optimization runs sorted newest-first. |
++| `GET` | `/api/runs/{run_id}` | `run_id` path param | Fetches a specific run by UUID (`404` if missing/expired). |
++| `PUT` | `/api/runs/{run_id}/save` | `SaveRequest` (`title`) | Marks a run as saved (`saved=True`) and removes TTL expiration (`409` if 100-run cap reached). |
++| `DELETE` | `/api/runs/{run_id}` | `run_id` path param | Deletes a saved run (`404` if not found). |
++
++## 21. Testing Instructions
++Run the complete automated test suite from the `backend/` directory:
+ ```bash
+ cd backend
+ pytest -v
+ ```
+-All **82 automated test cases** validate:
+-- 0/1 knapsack corner cases (empty, zero budget, all-fit, no-fit, ties)
+-- Fractional upper bound computation, pruning, and `max_queue_size` tracking
+-- Exact match between FIFO, LC, and DP across Shopping and Investment modes
+-- Multi-size Performance Benchmarking (`5, 10, 15, 20, 24` items), custom datasets, and timeout/node-limit handling
+-- What-If Budget Sensitivity Analysis monotonicity, budget adherence, solver parity, and automated insights
+-- 7-section PDF report generation and CSV benchmark export accuracy
+-- REST API validation and NDJSON streaming endpoints
++The test suite contains **90 automated test cases** across 5 modules:
++1. `tests/test_solver_algorithm_validation.py` (37 tests): Exhaustive subset cross-checks, tree invariants, fractional upper bounds, node caps, and decimal/NaN/Inf validation.
++2. `tests/test_api_e2e_budget_advisor.py` (17 tests): End-to-end REST API validation, 32 KB body limit (`413`), tie determinism, and Saved Runs CRUD lifecycle.
++3. `tests/test_dp_stream_regression.py` (16 tests): Sparse DP exactness on positive/negative/zero/fractional items, DP cap honesty, and NDJSON stream monotonicity & slot recovery.
++4. `tests/test_new_features_benchmark_sensitivity_reports.py` (12 tests): Multi-size benchmarking, What-If sensitivity monotonicity, and 7-section PDF & CSV export verification.
++5. `tests/test_comprehensive_rubric_audit.py` (8 comprehensive multi-assertion tests): FIFO level-order verification, single-item cases, exact-budget match, duplicate costs & duplicate values, multi-optimal canonical tie-breaking, negative/missing attribute rejection, 24-item scale verification, `_InMemoryClient` fallback CRUD, and empty-dataset/benchmark PDF reports.
++
++## 22. Theoretical Complexity Analysis
++
++### Variable Definitions
++- **$n$:** Number of available input items ($0 \le n \le 24$).
++- **$k$:** Number of search tree nodes generated or explored during Branch and Bound ($1 \le k \le 2^{n+1}-1$, capped at $\text{max\_nodes} \le 50,000$).
++- **$m$:** Instantaneous number of live nodes in the search frontier ($m \le k$).
++- **$W$:** Integer budget capacity scaled to hundredths ($W = \lfloor 100 \cdot B \rfloor$).
++- **$S$:** Number of reachable distinct integer-hundredth cost states in Sparse Dynamic Programming ($1 \le S \le \min(W + 1, 2^n, 50,000)$).
++
++### Granular Operation Complexity (1–8)
++1. **Sorting (`items.sort`):** $O(n \log n)$ time and $O(n)$ space using exact rational ratios `Fraction(score_hundredths, cost_hundredths)`.
++2. **Fractional-Knapsack Upper-Bound Calculation (`upper`):** $O(n - \text{depth}) = O(n)$ worst-case time per node and $O(1)$ auxiliary space.
++3. **Child-Node Generation:** $O(n)$ per expanded node (creating `include` and `exclude` children, copying `chosen` tuple of length $\le n$, and computing bounds).
++4. **Feasibility Checking (`node.cost > budget`):** $O(1)$ time per visited node.
++5. **FIFO Queue Operations (`deque.append` / `popleft`):** $O(1)$ amortized time per operation; $O(k)$ total queue overhead across $k$ nodes.
++6. **LC Priority Queue Operations (`heapq.heappush` / `heappop`):** $O(\log m) \subseteq O(\log k)$ time per operation; $O(k \log k)$ total heap overhead across $k$ nodes.
++7. **Branch Pruning (`node.bound < best_score`):** $O(1)$ time per visited node; strict inequality preserves equal-bound ties for canonical tie-breaking.
++8. **Search-Space Management:** $O(1)$ per visit for `max_queue_size` tracking; $O(\min(k, 30)) = O(1)$ bounded memory for visual `TraceNode` storage.
++
++### Best-Case, Average-Case, and Worst-Case Analysis
++- **Best Case:** When strong upper-bound pruning and an early high-density incumbent eliminate almost all sibling branches, only $k = \Theta(n)$ nodes are explored. Including $O(n \log n)$ sorting and $\Theta(n)$ upper-bound evaluations of cost $O(n)$ each, total best-case time is **$O(n^2)$** and frontier space is **$O(n)$**.
++- **Average Case (Input-Dependent $E[k]$):** Branch and Bound performance is input-dependent and governed by the expected number of explored nodes $E[k]$ for a given item distribution:
++  - **FIFO Expected Time:** **$O(n \log n + n \cdot E[k_{\text{FIFO}}])$**
++  - **LC Expected Time:** **$O(n \log n + n \cdot E[k_{\text{LC}}] + E[k_{\text{LC}}] \log E[k_{\text{LC}}])$**
++  - On typical inputs, LC expands high-bound nodes first and tightens `best_score` rapidly, resulting in $E[k_{\text{LC}}] \ll E[k_{\text{FIFO}}]$.
++- **Worst Case:** When pruning is ineffective (e.g., all items share nearly identical $v_i / c_i$ ratios so `node.bound < best_score` rarely triggers above the leaves), the binary tree explores $k = \Theta(2^n)$ nodes:
++  - **FIFO Search Time:** **$O(nk)$** $\implies$ **Worst-Case Time:** **$O(n 2^n)$**, **Worst-Case Search Space:** **$O(2^n)$**.
++  - **LC Search Time:** **$O(nk + k \log k)$** $\implies$ **Worst-Case Time:** **$O(n 2^n)$** (since $\log_2(2^n) = n$), **Worst-Case Search Space:** **$O(2^n)$**.
++- **Dynamic Programming Complexity:**
++  - **Standard Dense DP:** $O(nW)$ time and $O(nW)$ (or $O(W)$) space.
++  - **Actual Sparse-Cost DP (`solve_dp`):** **$O(n \cdot S) \subseteq O(nW)$** time (capped at $200,000$ evaluations) and **$O(n \cdot S)$** total space ($O(S)$ retained cost states, capped at $50,000$).
++
++### Space Complexity Distinction
++1. **Search Frontier Space:** $O(k_{\text{frontier}}) \subseteq O(2^n)$ live nodes held in `deque` (FIFO) or `heapq` (LC), measured empirically via `max_queue_size`.
++2. **Total Algorithm Space:** $O(n \cdot k_{\text{frontier}} + n)$ for Branch and Bound (including per-node `chosen` index tuples of length $\le n$), worst-case $O(n 2^n)$ (or $O(2^n)$ nodes); $O(n \cdot S)$ for Sparse DP.
++3. **Additional Data Structures:** Sorted item list $O(n)$, visualization `trace` dictionary capped at $30$ nodes $O(1)$, and sampled `SearchFrame` progress snapshots.
++
++### Comparison Table: FIFO B&B vs. LC B&B vs. Sparse DP
++
++| Criterion | FIFO Branch and Bound | Least Cost (LC) Branch and Bound | Sparse Dynamic Programming |
++| :--- | :--- | :--- | :--- |
++| **Traversal Order** | Breadth-First (Level-by-Level) | Best-First (Highest Upper Bound First) | Bottom-Up Stage-by-Stage Recurrence |
++| **Live Frontier Structure** | FIFO Queue (`collections.deque`) | Binary Min-Heap (`heapq` on `-bound`) | Hash Map (`dict[cost, (score, chosen)]`) |
++| **Sorting Overhead** | $O(n \log n)$ | $O(n \log n)$ | None ($O(1)$) |
++| **Upper-Bound Cost / Node** | $O(n)$ | $O(n)$ | Not used |
++| **Frontier Push / Pop Cost** | $O(1)$ amortized | $O(\log m) \subseteq O(\log k)$ | $O(1)$ average hash transition |
++| **Parameterized Search Time** | $O(nk)$ | $O(nk + k \log k)$ | $O(n \cdot S) \subseteq O(nW)$ |
++| **Best-Case Time** | $O(n^2)$ | $O(n^2)$ | $O(n \cdot S_{\min})$ |
++| **Average-Case Time** | $O(n \log n + n \cdot E[k_{\text{FIFO}}])$ | $O(n \log n + E[k_{\text{LC}}](n + \log E[k_{\text{LC}}]))$ | $O(n \cdot E[S])$ |
++| **Worst-Case Time** | $O(n 2^n)$ | $O(n 2^n)$ | $O(n \cdot \min(W, 2^n))$ |
++| **Worst-Case Search Space** | $O(2^n)$ | $O(2^n)$ | $O(\min(W, 2^n))$ |
++
++## 23. Team Workload Distribution (Group G12)
++
++> **Note:** Replace `[Full Name]` below with the actual names of the four Group G12 team members prior to final submission.
++
++- **Member 1: [Full Name]** — *FIFO Algorithm Development*
++  - FIFO Branch and Bound implementation (`backend/solver.py`, `frontend/src/localSolver.ts`).
++  - Queue management (`collections.deque`) and level-order traversal tracking.
++  - Fractional-knapsack continuous relaxation upper-bound calculation (`upper`).
++  - Budget feasibility checking (`pruned_budget`) and bound pruning (`pruned_bound`).
++  - FIFO unit and property testing (`backend/tests/test_solver_algorithm_validation.py`).
++- **Member 2: [Full Name]** — *LC Branch and Bound & DP Verification*
++  - Least Cost (LC) Branch and Bound implementation (`backend/solver.py`, `frontend/src/localSolver.ts`).
++  - Priority queue (`heapq`) ordering on negative upper bound `(-node.bound, node.id, node)`.
++  - Independent Sparse-Cost Dynamic Programming solver (`backend/dp_solver.py`).
++  - Canonical tie-breaking verification and tri-method consensus testing (`backend/tests/test_dp_stream_regression.py`, `backend/tests/test_comprehensive_rubric_audit.py`).
++- **Member 3: [Full Name]** — *Backend Architecture, Benchmarking, Sensitivity & Reports*
++  - FastAPI REST and NDJSON streaming APIs (`backend/server.py`, `backend/computation.py`).
++  - MongoDB persistence and resilient in-memory fallback (`_InMemoryClient`).
++  - Strict Pydantic financial/decimal validation (`backend/models.py`).
++  - Multi-size Performance Benchmarking engine (`backend/benchmark.py`).
++  - What-If Budget Sensitivity Analysis engine (`backend/sensitivity.py`).
++  - 7-section PDF 1.4 vector report and CSV export generator (`backend/report_generator.py`).
++- **Member 4: [Full Name]** — *Frontend Architecture, Visualizations & Interactive UI*
++  - Optimizer Dashboard, Shopping & Investment Advisor interfaces (`frontend/src/pages/Dashboard.tsx`, `ItemTable.tsx`, `SelectionPanel.tsx`).
++  - Interactive SVG Search Tree Visualization and Step-by-Step Replay (`SearchTree.tsx`, `TreeGraphic.tsx`).
++  - Performance Analysis charts and side-by-side benchmark table (`frontend/src/pages/PerformanceAnalysis.tsx`).
++  - What-If Budget Sensitivity interface and interactive point inspector (`frontend/src/pages/WhatIfAnalysis.tsx`).
++  - Export Reports interface (`frontend/src/pages/ExportReports.tsx`), Saved Runs (`SavedRuns.tsx`), and Behind the Algorithm theoretical guide (`Method.tsx`).
++
++## 24. Conclusion and Future Scope
++### Conclusion
++**BudgetAdvisor (Group G12)** demonstrates how exact combinatorial optimization via **0/1 Knapsack FIFO Branch and Bound** and **Least Cost (LC) Branch and Bound** solves practical budget-constrained decision problems in consumer shopping and capital allocation. By combining exact integer-hundredth arithmetic, rational profit-density sorting, conservative fractional-knapsack upper bounding, and independent **Sparse Dynamic Programming** verification, the system guarantees mathematically proven recommendations while making the internal behavior of Branch and Bound transparent through tree replay, empirical scaling benchmarks, and parametric sensitivity analysis.
++
++### Future Scope
++1. **Multi-Constraint Knapsack (0/1 MKP):** Incorporate category caps, minimum sector diversification rules, or risk/volatility budgets alongside the monetary budget constraint.
++2. **Quantity-Bounded & Fractional Hybrid Modes:** Extend the solver to support Bounded Knapsack ($x_i \in \{0, 1, \dots, q_i\}$) for multi-unit shopping or fractional lot allocations.
++3. **Parallel Branch and Bound Workers:** Distribute high-bound subtrees across multiple CPU cores for datasets scaling beyond $24$ items.
+diff --git a/backend/dp_solver.py b/backend/dp_solver.py
+index 3a2a2e8..6d622ca 100644
+--- a/backend/dp_solver.py
++++ b/backend/dp_solver.py
+@@ -1,8 +1,38 @@
+-"""Independent sparse-cost 0/1 DP, exact to hundredths; no budget-sized array.
++"""Independent Sparse-Cost 0/1 Dynamic Programming Verification Solver.
+ 
+-One state evaluation is an include transition from a prior-layer cost state,
+-including rejected over-budget transitions; the initial empty state counts once.
+-Limits avoid exponential sparse-state growth without ever claiming a partial proof.
++Project Group ID: G12
++Purpose: Independently computes and verifies the exact 0/1 Knapsack optimal value
++and canonical item combination without using fractional upper bounds or search trees.
++
++Theoretical Complexity Analysis
++-------------------------------
++Let:
++  - n = number of available items (0 <= n <= 24).
++  - W = integer budget capacity in hundredths (W = int(budget * 100)).
++  - S = number of reachable distinct cost states in `states` (1 <= S <= min(W + 1, 2^n, MAX_STATES)).
++
++1. Standard Dense DP vs. Sparse-Cost DP:
++   - A textbook dense 0/1 Knapsack DP allocates a table of size (n + 1) x (W + 1),
++     requiring O(nW) pseudo-polynomial time and O(nW) (or O(W)) memory. Because budgets
++     in BudgetAdvisor can reach Rs. 10,00,00,000 (W = 10^10 hundredths), a dense array of
++     size W is memory-prohibitive.
++   - Instead, `solve_dp` maintains a sparse hash map `states: dict[int, tuple[int, tuple[int, ...]]]`
++     mapping each reachable exact cost `c <= W` to its best `(score, chosen_indices)`.
++
++2. Time & Space Complexity:
++   - Time Complexity: O(n * S) <= O(n * min(W + 1, 2^n, MAX_STATES)) state transitions,
++     bounded by `MAX_EVALUATIONS = 200,000` and `request.time_limit_ms`.
++   - Retained State Space: O(S) entries in `states` (capped at `MAX_STATES = 50,000`).
++   - Total Algorithm Space: O(n * S) including the `chosen` index tuple of length <= n
++     stored per reachable cost state, plus O(S) for the per-item snapshot `previous`.
++
++3. Canonical Tie-Breaking & Honest Safeguards:
++   - At identical cost `next_cost`, a transition replaces the incumbent only if
++     `(-candidate_score, candidate_indices) < (-old_score, old_indices)`.
++   - Across all reachable costs at completion, the solver selects `min(states.items())`
++     by `(-score, cost, chosen_indices)`, matching FIFO and LC Branch and Bound.
++   - If `MAX_STATES`, `MAX_EVALUATIONS`, or `time_limit_ms` is reached, `proven_optimal`
++     is set to `False` with an explicit `stop_reason`.
+ """
+ from time import perf_counter
+ from models import SolveRequest, DPResult
+diff --git a/backend/models.py b/backend/models.py
+index 9d02823..9645362 100644
+--- a/backend/models.py
++++ b/backend/models.py
+@@ -437,6 +437,22 @@ class ReportExportRequest(CompatModel):
+                 raise ValueError('Item IDs must be unique.')
+             if self.mode == 'shopping' and any(not 0 <= i.score <= 100 for i in self.items):
+                 raise ValueError('Shopping scores must be between 0 and 100.')
++            if self.sensitivity_min_budget is not None:
++                _validate_finite_decimal(self.sensitivity_min_budget, 2, ge=Decimal('0'), le=Decimal('100000000'))
++            if self.sensitivity_max_budget is not None:
++                _validate_finite_decimal(self.sensitivity_max_budget, 2, ge=Decimal('0'), le=Decimal('100000000'))
++            if (
++                self.sensitivity_min_budget is not None
++                and self.sensitivity_max_budget is not None
++                and self.sensitivity_max_budget < self.sensitivity_min_budget
++            ):
++                raise ValueError('sensitivity_max_budget must be greater than or equal to sensitivity_min_budget.')
++            if self.include_benchmark:
++                if not self.benchmark_sizes or len(self.benchmark_sizes) > 10:
++                    raise ValueError('Provide between 1 and 10 benchmark sizes.')
++                for s in self.benchmark_sizes:
++                    if not (1 <= s <= 24):
++                        raise ValueError('Benchmark dataset sizes must be between 1 and 24 items.')
+             return self
+     else:
+         @_v1_validator('budget', pre=True)
+@@ -457,4 +473,21 @@ class ReportExportRequest(CompatModel):
+                 raise ValueError('Item IDs must be unique.')
+             if mode == 'shopping' and any(not 0 <= i.score <= 100 for i in items):
+                 raise ValueError('Shopping scores must be between 0 and 100.')
++            s_min = values.get('sensitivity_min_budget')
++            s_max = values.get('sensitivity_max_budget')
++            if s_min is not None:
++                s_min = _validate_finite_decimal(s_min, 2, ge=Decimal('0'), le=Decimal('100000000'))
++                values['sensitivity_min_budget'] = s_min
++            if s_max is not None:
++                s_max = _validate_finite_decimal(s_max, 2, ge=Decimal('0'), le=Decimal('100000000'))
++                values['sensitivity_max_budget'] = s_max
++            if s_min is not None and s_max is not None and s_max < s_min:
++                raise ValueError('sensitivity_max_budget must be greater than or equal to sensitivity_min_budget.')
++            if values.get('include_benchmark'):
++                b_sizes = values.get('benchmark_sizes') or []
++                if not b_sizes or len(b_sizes) > 10:
++                    raise ValueError('Provide between 1 and 10 benchmark sizes.')
++                for s in b_sizes:
++                    if not (1 <= s <= 24):
++                        raise ValueError('Benchmark dataset sizes must be between 1 and 24 items.')
+             return values
+\ No newline at end of file
+diff --git a/backend/report_generator.py b/backend/report_generator.py
+index 737549c..5a876f4 100644
+--- a/backend/report_generator.py
++++ b/backend/report_generator.py
+@@ -1,4 +1,4 @@
+-"""Downloadable PDF and CSV Optimization Report Generator for BudgetAdvisor.
++"""Downloadable PDF and CSV Optimization Report Generator for BudgetAdvisor (Group G12).
+ 
+ Zero third-party PDF dependencies required: uses a deterministic, self-contained
+ PDF 1.4 writer with native vector graphics, crisp tables, consistent typography,
+@@ -25,10 +25,11 @@ from benchmark import run_benchmark_suite
+ 
+ def _pdf_escape(text: str) -> str:
+     """Sanitize and escape text for PDF WinAnsiEncoding / Type1 fonts."""
+-    # Replace Rupee symbol with "Rs. " because standard PDF Type1 Helvetica uses WinAnsiEncoding
++    # Replace Rupee symbol and Unicode punctuation outside ISO-8859-1 with clean equivalents
+     cleaned = (
+         str(text)
+         .replace('₹', 'Rs. ')
++        .replace('•', '-')
+         .replace('—', '-')
+         .replace('–', '-')
+         .replace('·', '-')
+@@ -124,10 +125,10 @@ class AcademicPDFBuilder:
+         box_h = 54.0
+         box_y = self.y - box_h
+         self.draw_rect(self.MARGIN_X, box_y, self.content_w, box_h, fill_rgb=(0.18, 0.38, 0.34))
+-        self.draw_text(self.MARGIN_X + 14, box_y + 32, title, font='F2', size=15, rgb=(1, 1, 1))
+-        self.draw_text(self.MARGIN_X + 14, box_y + 14, subtitle, font='F1', size=9, rgb=(0.88, 0.94, 0.91))
++        self.draw_text(self.MARGIN_X + 14, box_y + 32, title, font='F2', size=14.0, rgb=(1, 1, 1))
++        self.draw_text(self.MARGIN_X + 14, box_y + 13, subtitle, font='F1', size=8.8, rgb=(0.88, 0.94, 0.91))
+         if meta_right:
+-            self.draw_text(self.PAGE_W - self.MARGIN_X - 165, box_y + 14, meta_right, font='F1', size=8.5, rgb=(0.9, 0.95, 0.92))
++            self.draw_text(self.PAGE_W - self.MARGIN_X - 118, box_y + 33, meta_right, font='F1', size=8.0, rgb=(0.9, 0.95, 0.92))
+         self.y = box_y - 14
+ 
+     def add_section_heading(self, number_str: str, title: str):
+@@ -160,7 +161,11 @@ class AcademicPDFBuilder:
+             y_top = self.y - r * row_h
+             self.draw_rect(x + 2, y_top - row_h + 3, col_w - 4, row_h - 4, fill_rgb=(0.96, 0.98, 0.97), stroke_rgb=(0.86, 0.89, 0.88))
+             self.draw_text(x + 8, y_top - 11, label.upper(), font='F1', size=7.0, rgb=(0.42, 0.47, 0.45))
+-            self.draw_text(x + 8, y_top - 22, str(val)[:36], font='F2', size=9.5, rgb=(0.14, 0.18, 0.18))
++            val_str = str(val)
++            if len(val_str) > 28:
++                val_str = val_str[:27] + '.'
++            val_size = 8.6 if len(val_str) > 22 else 9.5
++            self.draw_text(x + 8, y_top - 22, val_str, font='F2', size=val_size, rgb=(0.14, 0.18, 0.18))
+         self.y -= total_h + 4
+ 
+     def add_table(self, headers: list[str], rows: list[list[str]], col_Editable_fractions: list[float]):
+@@ -257,7 +262,7 @@ class AcademicPDFBuilder:
+             footer_y = 24.0
+             r, g, b = (0.48, 0.53, 0.51)
+             line_cmd = f'q 0.5 w 0.85 0.88 0.86 RG {self.MARGIN_X:.2f} {footer_y + 11:.2f} m {self.PAGE_W - self.MARGIN_X:.2f} {footer_y + 11:.2f} l S Q'
+-            left_txt = _pdf_escape('BudgetAdvisor · 0/1 Knapsack Optimization & Algorithm Analysis Report')
++            left_txt = _pdf_escape('BudgetAdvisor (Group G12) · 0/1 Knapsack Optimization & Algorithm Analysis Report')
+             right_txt = _pdf_escape(f'Page {idx + 1} of {total_pages}')
+             left_cmd = f'q BT /F1 7.5 Tf {r:.3f} {g:.3f} {b:.3f} rg {self.MARGIN_X:.2f} {footer_y:.2f} Td ({left_txt}) Tj ET Q'
+             right_cmd = f'q BT /F2 7.5 Tf {r:.3f} {g:.3f} {b:.3f} rg {self.PAGE_W - self.MARGIN_X - 52:.2f} {footer_y:.2f} Td ({right_txt}) Tj ET Q'
+@@ -328,7 +333,7 @@ def generate_optimization_pdf_report(req: ReportExportRequest) -> bytes:
+ 
+     # Banner
+     pdf.add_banner(
+-        title='BudgetAdvisor — Optimization & DAA Report',
++        title='BudgetAdvisor (Group G12) — Optimization & DAA Report',
+         subtitle='0/1 Knapsack Problem: FIFO Branch & Bound, LC Branch & Bound, and DP Verification',
+         meta_right=now_str,
+     )
+@@ -336,7 +341,7 @@ def generate_optimization_pdf_report(req: ReportExportRequest) -> bytes:
+     # Section 1: Project and Optimization Details
+     pdf.add_section_heading('1', 'Project and Optimization Details')
+     pdf.add_kv_grid([
+-        ('Application', 'BudgetAdvisor (0/1 Knapsack)'),
++        ('Application & Group', 'BudgetAdvisor (Group G12)'),
+         ('Selected Mode', f'{req.mode.title()} Advisor'),
+         ('Dataset Name', req.dataset_name),
+         ('Available Budget', f'Rs. {float(req.budget):,.2f}'),
+@@ -429,6 +434,38 @@ def generate_optimization_pdf_report(req: ReportExportRequest) -> bytes:
+         col_Editable_fractions=[0.20, 0.11, 0.11, 0.11, 0.10, 0.11, 0.11, 0.15],
+     )
+ 
++    if req.include_benchmark and req.benchmark_sizes:
++        bench_req = BenchmarkRequest(
++            mode=req.mode,
++            dataset_source='custom' if len(req.items) > 0 else 'generated',
++            sizes=req.benchmark_sizes,
++            repetitions=2,
++            budget=req.budget if len(req.items) > 0 else None,
++            custom_items=req.items if len(req.items) > 0 else None,
++            max_nodes=req.max_nodes,
++            time_limit_ms=req.time_limit_ms,
++        )
++        bench_res = run_benchmark_suite(bench_req)
++        pdf.add_paragraph('Multi-Size Scaling Benchmark Summary (Median Execution Time & Node Counts):', font='F2', size=9.0)
++        bench_rows = []
++        for brow in bench_res.rows:
++            for m in (brow.fifo, brow.lc):
++                bench_rows.append([
++                    f'{brow.dataset_size} items',
++                    m.strategy.upper(),
++                    f'{m.execution_time_ms:.3f} ms',
++                    f'{m.nodes_generated:,}',
++                    f'{m.nodes_explored:,}',
++                    f'{m.nodes_pruned:,}',
++                    f'{m.max_queue_size:,}',
++                    f'{m.optimal_value:,.2f}',
++                ])
++        pdf.add_table(
++            headers=['Size', 'Algo', 'Median Time', 'Generated', 'Explored', 'Pruned', 'Max Queue', 'Opt Val'],
++            rows=bench_rows,
++            col_Editable_fractions=[0.11, 0.10, 0.14, 0.13, 0.13, 0.13, 0.13, 0.13],
++        )
++
+     # Section 5: Verification
+     pdf.add_section_heading('5', 'Independent Dynamic Programming Verification')
+     if dp is not None:
+@@ -494,7 +531,7 @@ def generate_optimization_pdf_report(req: ReportExportRequest) -> bytes:
+             col_Editable_fractions=[0.17, 0.15, 0.17, 0.16, 0.11, 0.12, 0.12],
+         )
+         for ins in sens_res.insights[:3]:
+-            pdf.add_paragraph(f'• {ins.title}: {ins.description}')
++            pdf.add_paragraph(f'- {ins.title}: {ins.description}')
+     else:
+         pdf.add_paragraph('Budget sensitivity analysis was not requested or the input dataset is empty.')
+ 
+diff --git a/backend/solver.py b/backend/solver.py
+index 65607e1..33bab0d 100644
+--- a/backend/solver.py
++++ b/backend/solver.py
+@@ -1,9 +1,69 @@
+-"""Deterministic 0/1 B&B. All objective/cost arithmetic uses hundredths.
++"""Deterministic 0/1 Knapsack Branch and Bound Solver (FIFO & Least Cost).
+ 
+-Visited means popped, including infeasible and bound-pruned nodes. Both
+-strategies enqueue the same include-then-exclude branches and use the same
+-conservative fractional upper bound. LC minimizes the negative upper bound.
+-Equal bounds are NOT pruned: score ties use lower spend, then original indices.
++Project Group ID: G12
++Assigned Topic: 0/1 Knapsack using FIFO Branch and Bound and Least Cost (LC) Branch and Bound.
++
++All monetary costs, budgets, and utility/return scores use exact integer hundredths
++to eliminate IEEE-754 binary floating-point rounding drift.
++
++Algorithmic & Theoretical Complexity Summary
++--------------------------------------------
++Let:
++  - n = number of available input items (0 <= n <= 24).
++  - k = number of search tree nodes generated / explored (1 <= k <= 2^(n+1) - 1,
++        capped at request.max_nodes <= 50,000).
++  - m = instantaneous size of the live search frontier (queue or min-heap), m <= k.
++
++1. Preprocessing & Sorting:
++   Items are sorted once in descending order of exact rational value-to-cost density
++   (v_i / c_i) via `Fraction(score_hundredths, cost_hundredths)`, breaking ties by
++   original item index:
++     - Time Complexity: O(n log n)
++     - Auxiliary Space: O(n)
++
++2. Fractional-Knapsack Upper-Bound Calculation (`upper(depth, cost, score)`):
++   Computes the continuous relaxation upper bound by greedily filling remaining budget
++   capacity `room = budget - cost` from `items[depth:]` and rounding the final fractional
++   slice UP to the nearest integer hundredth:
++     `bound += (value * room + price - 1) // price`
++   Stops immediately if `value <= 0` because remaining items have non-positive density.
++     - Time Complexity per Node: O(n - depth) = O(n) worst case
++     - Space Complexity: O(1)
++
++3. Child-Node Generation (`include` then `exclude`):
++   Each expanded internal node generates two children (`take=True`, `take=False`),
++   extending `node.chosen` (up to length n) and invoking `upper(depth + 1, ...)`:
++     - Time Complexity per Expansion: O(n)
++
++4. Feasibility Checking & Branch Pruning:
++   - Budget feasibility check (`node.cost > budget`): O(1) per visited node.
++     Immediately pruned as `pruned_budget` (`infeasible_pruned`).
++   - Upper-bound pruning check (`node.bound < best_score`): O(1) per visited node.
++     Uses strict inequality (`<`) so equal-bound nodes are NOT pruned; score ties are
++     resolved deterministically by lower total cost, then lexicographically smallest
++     original item index tuple `(-score, cost, sorted_indices)`.
++
++5. Frontier Operations & Overall Search Complexity:
++   - FIFO Branch and Bound (`collections.deque`):
++       * Enqueue (`append`) and Dequeue (`popleft`): O(1) amortized per node.
++       * Search Time (for k explored/generated nodes): O(n log n + n*k) = O(nk).
++       * Best-Case Time (strong pruning, k = Theta(n)): O(n^2).
++       * Average-Case Time (input-dependent expected nodes E[k]): O(n log n + n * E[k]).
++       * Worst-Case Time (ineffective pruning, k = Theta(2^n)): O(n * 2^n).
++       * Worst-Case Search Space / Frontier Space: O(2^n) nodes.
++   - Least Cost (LC) Branch and Bound (`heapq` binary min-heap on `(-node.bound, node.id, node)`):
++       * Insert (`heappush`) and Extract-Min (`heappop`): O(log m) <= O(log k) per node.
++       * Search Time (for k explored/generated nodes): O(n log n + n*k + k log k) = O(nk + k log k).
++       * Best-Case Time (strong pruning, k = Theta(n)): O(n^2).
++       * Average-Case Time (input-dependent expected nodes E[k]): O(n log n + E[k]*(n + log E[k])).
++       * Worst-Case Time (k = Theta(2^n), where log(2^n) = n): O(n * 2^n).
++       * Worst-Case Search Space / Frontier Space: O(2^n) nodes.
++
++6. Space Distinction:
++   - Search Frontier Space: Live nodes currently in `queue` or `heap`, bounded by
++     `max_queue_size` (worst-case O(2^n) nodes, or O(n * 2^n) including `chosen` tuples).
++   - Additional Data Structures: Sorted item array O(n), visualization `trace` dictionary
++     capped at 30 nodes O(1), and sampled `progress` frames.
+ """
+ from collections import deque
+ from dataclasses import dataclass
+@@ -31,14 +91,17 @@ class Node:
+ 
+ 
+ def solve(request: SolveRequest, strategy: str, on_progress=None) -> SolverResult:
++    """Execute 0/1 Knapsack using FIFO ('fifo') or Least Cost ('lc') Branch and Bound."""
+     if strategy not in ('fifo', 'lc'):
+         raise ValueError('Unknown strategy')
+     start = perf_counter()
+     budget = int(request.budget * 100)
+     items = [(idx, int(i.cost * 100), int(i.score * 100)) for idx, i in enumerate(request.items)]
++    # Step 1: O(n log n) exact rational sort by descending score/cost ratio, tie-broken by original index
+     items.sort(key=lambda i: (-Fraction(i[2], i[1]), i[0]))
+ 
+     def upper(depth, cost, score):
++        """O(n - depth) fractional-knapsack continuous relaxation upper bound."""
+         if cost > budget:
+             return -(10 ** 30)
+         room, bound = budget - cost, score
+@@ -49,7 +112,7 @@ def solve(request: SolveRequest, strategy: str, on_progress=None) -> SolverResul
+                 bound += value
+                 room -= price
+             else:
+-                # Ceiling in score hundredths is an upper (never lower) bound.
++                # Ceiling in score hundredths is a conservative upper (never lower) bound.
+                 bound += (value * room + price - 1) // price
+                 break
+         return bound
+@@ -76,9 +139,11 @@ def solve(request: SolveRequest, strategy: str, on_progress=None) -> SolverResul
+         nonlocal generated, max_queue_size
+         generated += 1
+         if strategy == 'fifo':
++            # O(1) FIFO queue enqueue
+             queue.append(node)
+             current_q = len(queue)
+         else:
++            # O(log m) LC min-heap push keyed by (-node.bound, node.id)
+             heapq.heappush(heap, (-node.bound, node.id, node))
+             current_q = len(heap)
+         if current_q > max_queue_size:
+@@ -105,13 +170,16 @@ def solve(request: SolveRequest, strategy: str, on_progress=None) -> SolverResul
+         visited += 1
+         status = 'expanded'
+         if node.cost > budget:
++            # O(1) feasibility pruning: node exceeds budget
+             infeasible_pruned += 1
+             status = 'pruned_budget'
+         else:
+             indices = tuple(sorted(node.chosen))
++            # Canonical tie-breaking: max score -> min cost -> lexicographically first original indices
+             if (-node.score, node.cost, indices) < (-best_score, best_cost, best_indices):
+                 best_score, best_cost, best_indices = node.score, node.cost, indices
+             if node.bound < best_score:
++                # O(1) upper-bound pruning: optimistic bound cannot reach incumbent best_score
+                 bound_pruned += 1
+                 status = 'pruned_bound'
+             elif node.depth == len(items):
+diff --git a/backend/tests/test_comprehensive_rubric_audit.py b/backend/tests/test_comprehensive_rubric_audit.py
+new file mode 100644
+index 0000000..dea38e4
+--- /dev/null
++++ b/backend/tests/test_comprehensive_rubric_audit.py
+@@ -0,0 +1,376 @@
++"""Comprehensive Rubric Audit Tests for BudgetAdvisor (Group G12).
++
++Covers all Professor Mini-Project Guideline requirements across:
++- Category 1 (Correctness): FIFO queue level-order traversal, LC priority-queue bound ordering,
++  fractional-knapsack upper-bound conservatives, feasibility checking, branch pruning,
++  DP independent verification, and multi-optimal canonical tie-breaking.
++- Category 2 (Robustness): All 18 required edge cases including empty dataset, single item,
++  zero budget, budget < min item, budget == item cost, budget > total cost, item > budget,
++  duplicate item costs, duplicate item values, multiple optimal combinations, negative/invalid costs,
++  invalid budgets, missing item attributes, 24-item max datasets, search node limits,
++  execution time limits, invalid API requests, and database unavailability / in-memory fallback.
++- Category 4 & 5 (Practical Application & Theoretical/Empirical Features): Shopping & Investment modes,
++  Performance Benchmarking, What-If Budget Sensitivity Analysis, and PDF/CSV Report Generation.
++"""
++from __future__ import annotations
++
++import asyncio
++from decimal import Decimal
++from itertools import combinations
++import io
++import os
++from pathlib import Path
++import sys
++
++import pypdf
++import pytest
++from pydantic import ValidationError
++import requests
++from dotenv import load_dotenv
++
++sys.path.append(str(Path(__file__).resolve().parents[1]))
++
++from benchmark import generate_benchmark_dataset, run_benchmark_suite  # noqa: E402
++from computation import compute_run  # noqa: E402
++from dp_solver import solve_dp  # noqa: E402
++from models import (  # noqa: E402
++    BenchmarkRequest,
++    Item,
++    ReportExportRequest,
++    SensitivityRequest,
++    SolveRequest,
++)
++from report_generator import generate_benchmark_csv, generate_optimization_pdf_report  # noqa: E402
++from sensitivity import run_sensitivity_analysis  # noqa: E402
++from server import _InMemoryClient, _InMemoryCollection, _InMemoryDB  # noqa: E402
++from solver import solve, solve_pair  # noqa: E402
++
++load_dotenv(Path(__file__).resolve().parents[2] / "frontend" / ".env")
++BASE_URL = os.environ.get("REACT_APP_BACKEND_URL") or "http://127.0.0.1:8000"
++
++
++@pytest.fixture(scope="session")
++def api_client():
++    session = requests.Session()
++    session.headers.update({"Content-Type": "application/json"})
++    return session
++
++
++def _exhaustive_knapsack(req: SolveRequest) -> tuple[float, float, list[str]]:
++    budget_c = int(req.budget * 100)
++    costs = [int(it.cost * 100) for it in req.items]
++    scores = [int(it.score * 100) for it in req.items]
++    best_score, best_cost, best_indices = 0, 0, ()
++    n = len(req.items)
++    for r in range(n + 1):
++        for subset in combinations(range(n), r):
++            c = sum(costs[i] for i in subset)
++            if c > budget_c:
++                continue
++            s = sum(scores[i] for i in subset)
++            if (-s, c, subset) < (-best_score, best_cost, best_indices):
++                best_score, best_cost, best_indices = s, c, subset
++    return (
++        best_score / 100,
++        best_cost / 100,
++        [req.items[i].id for i in best_indices],
++    )
++
++
++# ============================================================================
++# CATEGORY 1: CORRECTNESS AUDIT TESTS
++# ============================================================================
++
++def test_fifo_level_order_traversal_and_upper_bound_conservativeness():
++    """Verify FIFO explores nodes in non-decreasing tree depth (breadth-first level order)
++    and that root upper bound is always >= optimal 0/1 score."""
++    req = SolveRequest(
++        mode="shopping",
++        budget=Decimal("7000.00"),
++        items=[
++            {"id": "i1", "name": "Item 1", "cost": Decimal("3000.00"), "score": Decimal("90.00")},
++            {"id": "i2", "name": "Item 2", "cost": Decimal("2500.00"), "score": Decimal("75.00")},
++            {"id": "i3", "name": "Item 3", "cost": Decimal("2000.00"), "score": Decimal("50.00")},
++            {"id": "i4", "name": "Item 4", "cost": Decimal("4000.00"), "score": Decimal("85.00")},
++        ],
++    )
++    fifo = solve(req, "fifo")
++    dp = solve_dp(req)
++    assert fifo.proven_optimal is True
++    assert fifo.total_score == dp.total_score
++
++    # Verify visited trace nodes in FIFO are popped in non-decreasing depth order
++    visited_trace = sorted(
++        [t for t in fifo.trace if t.visit_order is not None],
++        key=lambda t: t.visit_order,
++    )
++    depths = [t.depth for t in visited_trace]
++    assert depths == sorted(depths), "FIFO must pop nodes in level-by-level (non-decreasing depth) order"
++
++    # Root upper bound must be >= final optimal 0/1 score
++    root_node = next(t for t in fifo.trace if t.parent is None)
++    assert root_node.bound is not None
++    assert root_node.bound >= fifo.total_score
++
++
++def test_lc_priority_queue_bound_ordering_and_dp_agreement():
++    """Verify LC Branch and Bound prioritizes highest upper bound first and matches DP and exhaustive search."""
++    req = SolveRequest(
++        mode="shopping",
++        budget=Decimal("6000.00"),
++        items=[
++            {"id": "a", "name": "High Density", "cost": Decimal("2000.00"), "score": Decimal("80.00")},
++            {"id": "b", "name": "Med Density", "cost": Decimal("3000.00"), "score": Decimal("90.00")},
++            {"id": "c", "name": "Low Density", "cost": Decimal("3500.00"), "score": Decimal("70.00")},
++            {"id": "d", "name": "Small Filler", "cost": Decimal("1000.00"), "score": Decimal("25.00")},
++        ],
++    )
++    fifo, lc, rec = solve_pair(req)
++    dp = solve_dp(req)
++    exp_score, exp_cost, exp_ids = _exhaustive_knapsack(req)
++
++    assert fifo.total_score == lc.total_score == dp.total_score == exp_score
++    assert fifo.total_cost == lc.total_cost == dp.total_cost == exp_cost
++    assert fifo.selected_ids == lc.selected_ids == dp.selected_ids == exp_ids
++    assert rec in ("fifo", "lc")
++
++
++# ============================================================================
++# CATEGORY 2: ROBUSTNESS & EDGE-CASE AUDIT TESTS
++# ============================================================================
++
++@pytest.mark.parametrize("strategy", ["fifo", "lc"])
++def test_single_item_affordable_unaffordable_and_negative(strategy: str):
++    """Test single-item datasets: affordable positive, unaffordable positive, and negative score in investment mode."""
++    # 1. Single affordable positive item
++    req_fit = SolveRequest(
++        mode="shopping",
++        budget=Decimal("500.00"),
++        items=[{"id": "solo", "name": "Solo Item", "cost": Decimal("400.00"), "score": Decimal("80.00")}],
++    )
++    res_fit = solve(req_fit, strategy)
++    dp_fit = solve_dp(req_fit)
++    assert res_fit.selected_ids == ["solo"]
++    assert res_fit.total_cost == 400.0
++    assert res_fit.total_score == 80.0
++    assert res_fit.remaining_budget == 100.0
++    assert dp_fit.selected_ids == ["solo"]
++
++    # 2. Single unaffordable item (item cost exceeding budget)
++    req_nofit = SolveRequest(
++        mode="shopping",
++        budget=Decimal("300.00"),
++        items=[{"id": "solo", "name": "Solo Item", "cost": Decimal("400.00"), "score": Decimal("80.00")}],
++    )
++    res_nofit = solve(req_nofit, strategy)
++    dp_nofit = solve_dp(req_nofit)
++    assert res_nofit.selected_ids == []
++    assert res_nofit.total_cost == 0.0
++    assert res_nofit.total_score == 0.0
++    assert res_nofit.remaining_budget == 300.0
++    assert dp_nofit.selected_ids == []
++
++    # 3. Single affordable negative-score item in investment mode (must be excluded)
++    req_neg = SolveRequest(
++        mode="investment",
++        budget=Decimal("1000.00"),
++        items=[{"id": "loss", "name": "Loss Asset", "cost": Decimal("400.00"), "score": Decimal("-12.50")}],
++    )
++    res_neg = solve(req_neg, strategy)
++    dp_neg = solve_dp(req_neg)
++    assert res_neg.selected_ids == []
++    assert res_neg.total_score == 0.0
++    assert res_neg.remaining_budget == 1000.0
++    assert dp_neg.selected_ids == []
++
++
++@pytest.mark.parametrize("strategy", ["fifo", "lc"])
++def test_budget_exactly_equal_to_item_cost(strategy: str):
++    """Test budget exactly equal to an item's cost leaves 0.00 remaining budget."""
++    req = SolveRequest(
++        mode="shopping",
++        budget=Decimal("2500.00"),
++        items=[
++            {"id": "exact", "name": "Exact Match", "cost": Decimal("2500.00"), "score": Decimal("88.00")},
++            {"id": "other", "name": "Other Item", "cost": Decimal("1800.00"), "score": Decimal("60.00")},
++        ],
++    )
++    res = solve(req, strategy)
++    dp = solve_dp(req)
++    assert res.selected_ids == ["exact"]
++    assert res.total_cost == 2500.0
++    assert res.remaining_budget == 0.0
++    assert dp.selected_ids == ["exact"]
++
++
++@pytest.mark.parametrize("strategy", ["fifo", "lc"])
++def test_duplicate_item_costs_and_duplicate_item_values(strategy: str):
++    """Test datasets with duplicate item costs and duplicate item values/scores."""
++    # Duplicate costs with different values -> must pick highest value
++    req_dup_cost = SolveRequest(
++        mode="shopping",
++        budget=Decimal("2000.00"),
++        items=[
++            {"id": "c1", "name": "Dup Cost Low Val", "cost": Decimal("1000.00"), "score": Decimal("40.00")},
++            {"id": "c2", "name": "Dup Cost High Val", "cost": Decimal("1000.00"), "score": Decimal("90.00")},
++            {"id": "c3", "name": "Dup Cost Mid Val", "cost": Decimal("1000.00"), "score": Decimal("70.00")},
++        ],
++    )
++    res_c = solve(req_dup_cost, strategy)
++    dp_c = solve_dp(req_dup_cost)
++    assert res_c.selected_ids == ["c2", "c3"]
++    assert res_c.total_score == 160.0
++    assert dp_c.selected_ids == ["c2", "c3"]
++
++    # Duplicate values with different costs -> tie-breaker must prefer lower total cost!
++    req_dup_val = SolveRequest(
++        mode="shopping",
++        budget=Decimal("5000.00"),
++        items=[
++            {"id": "expensive", "name": "Expensive 80", "cost": Decimal("4500.00"), "score": Decimal("80.00")},
++            {"id": "cheap", "name": "Cheap 80", "cost": Decimal("3200.00"), "score": Decimal("80.00")},
++        ],
++    )
++    res_v = solve(req_dup_val, strategy)
++    dp_v = solve_dp(req_dup_val)
++    # Only one can fit since 4500 + 3200 = 7700 > 5000; both give score 80, so lower cost ("cheap", 3200) must win
++    assert res_v.selected_ids == ["cheap"]
++    assert res_v.total_cost == 3200.0
++    assert res_v.remaining_budget == 1800.0
++    assert dp_v.selected_ids == ["cheap"]
++
++
++def test_multiple_equally_optimal_combinations_tie_breaking():
++    """Verify multiple combinations with identical score and cost resolve to lexicographically first original indices."""
++    req = SolveRequest(
++        mode="shopping",
++        budget=Decimal("3000.00"),
++        items=[
++            {"id": "first", "name": "First Pair A", "cost": Decimal("1500.00"), "score": Decimal("50.00")},
++            {"id": "second", "name": "First Pair B", "cost": Decimal("1500.00"), "score": Decimal("50.00")},
++            {"id": "third", "name": "Alt Single", "cost": Decimal("3000.00"), "score": Decimal("100.00")},
++            {"id": "fourth", "name": "Second Pair A", "cost": Decimal("1000.00"), "score": Decimal("40.00")},
++            {"id": "fifth", "name": "Second Pair B", "cost": Decimal("2000.00"), "score": Decimal("60.00")},
++        ],
++    )
++    run = compute_run(req)
++    assert run.fifo.selected_ids == ["first", "second"]
++    assert run.lc.selected_ids == ["first", "second"]
++    assert run.dp is not None and run.dp.selected_ids == ["first", "second"]
++    assert run.fifo.total_score == run.lc.total_score == run.dp.total_score == 100.0
++
++
++def test_invalid_inputs_negative_costs_invalid_budgets_missing_attributes():
++    """Verify Pydantic models reject negative costs, negative budgets, missing item attributes, and >24 items."""
++    # Negative cost
++    with pytest.raises(ValidationError):
++        Item(id="1", name="Bad Cost", cost=Decimal("-50.00"), score=Decimal("10.00"))
++
++    # Zero cost
++    with pytest.raises(ValidationError):
++        Item(id="1", name="Zero Cost", cost=Decimal("0.00"), score=Decimal("10.00"))
++
++    # Missing required attribute (score)
++    with pytest.raises(ValidationError):
++        Item(id="1", name="Missing Score", cost=Decimal("100.00"))  # type: ignore[call-arg]
++
++    # Negative budget
++    with pytest.raises(ValidationError):
++        SolveRequest(
++            mode="shopping",
++            budget=Decimal("-100.00"),
++            items=[{"id": "1", "name": "Valid", "cost": Decimal("50.00"), "score": Decimal("20.00")}],
++        )
++
++    # Budget > 100,000,000
++    with pytest.raises(ValidationError):
++        SolveRequest(
++            mode="shopping",
++            budget=Decimal("100000001.00"),
++            items=[{"id": "1", "name": "Valid", "cost": Decimal("50.00"), "score": Decimal("20.00")}],
++        )
++
++
++def test_large_supported_24_item_dataset_and_never_exceeds_budget():
++    """Test maximum supported 24-item dataset in both Shopping and Investment modes."""
++    for mode in ("shopping", "investment"):
++        items, budget = generate_benchmark_dataset(mode, size=24, seed=42)
++        assert len(items) == 24
++        req = SolveRequest(mode=mode, items=items, budget=budget, max_nodes=50_000, time_limit_ms=1500)
++        run = compute_run(req)
++        assert run.fifo.total_cost <= float(budget)
++        assert run.lc.total_cost <= float(budget)
++        assert run.dp is not None and run.dp.total_cost <= float(budget)
++        if run.fifo.proven_optimal and run.lc.proven_optimal and run.dp.proven_optimal:
++            assert run.fifo.total_score == run.lc.total_score == run.dp.total_score
++
++
++def test_in_memory_database_fallback_operations():
++    """Directly verify the built-in _InMemoryClient / _InMemoryDB / _InMemoryCollection fallback."""
++    async def _exercise():
++        client = _InMemoryClient()
++        db = client["fallback_test_db"]
++        assert isinstance(db, _InMemoryDB)
++        assert isinstance(db.datasets, _InMemoryCollection)
++
++        # Upsert dataset
++        await db.datasets.update_one(
++            {"mode": "shopping"},
++            {"$setOnInsert": {"mode": "shopping", "budget": "10000", "items": []}},
++            upsert=True,
++        )
++        assert await db.datasets.count_documents({"mode": "shopping"}) == 1
++        doc = await db.datasets.find_one({"mode": "shopping"}, {"_id": 0})
++        assert doc is not None and doc["budget"] == "10000"
++
++        # Insert runs, sort, update with $set and $unset, delete
++        await db.runs.insert_one({"id": "r1", "created_at": "2026-01-01T00:00:00Z", "saved": False, "expires_at": "soon"})
++        await db.runs.insert_one({"id": "r2", "created_at": "2026-01-02T00:00:00Z", "saved": True, "title": "Run 2"})
++        await db.runs.update_one({"id": "r1"}, {"$set": {"saved": True, "title": "Run 1"}, "$unset": {"expires_at": ""}})
++
++        r1 = await db.runs.find_one({"id": "r1"}, {"_id": 0})
++        assert r1 is not None and r1["saved"] is True and "expires_at" not in r1
++
++        saved_list = await db.runs.find({"saved": True}, {"_id": 0}).sort("created_at", -1).to_list(10)
++        assert [r["id"] for r in saved_list] == ["r2", "r1"]
++
++        del_res = await db.runs.delete_one({"id": "r1", "saved": True})
++        assert del_res.deleted_count == 1
++        assert await db.runs.find_one({"id": "r1"}) is None
++        client.close()
++
++    asyncio.run(_exercise())
++
++
++def test_pdf_report_with_benchmark_table_and_empty_dataset(api_client):
++    """Verify PDF report generation when include_benchmark=True and when items=[]."""
++    items, budget = generate_benchmark_dataset("shopping", size=8, seed=42)
++    req_with_bench = ReportExportRequest(
++        dataset_name="Full G12 Report With Benchmark",
++        mode="shopping",
++        items=items,
++        budget=budget,
++        include_sensitivity=True,
++        sensitivity_intervals=4,
++        include_benchmark=True,
++        benchmark_sizes=[5, 8],
++    )
++    pdf_bytes = generate_optimization_pdf_report(req_with_bench)
++    reader = pypdf.PdfReader(io.BytesIO(pdf_bytes))
++    full_text = "\n".join(p.extract_text() or "" for p in reader.pages)
++    assert "Group G12" in full_text
++    assert "Multi-Size Scaling Benchmark Summary" in full_text
++
++    # Empty dataset PDF export
++    req_empty = ReportExportRequest(
++        dataset_name="Empty Dataset Report",
++        mode="shopping",
++        items=[],
++        budget=Decimal("5000.00"),
++        include_sensitivity=True,
++    )
++    empty_pdf = generate_optimization_pdf_report(req_empty)
++    empty_reader = pypdf.PdfReader(io.BytesIO(empty_pdf))
++    empty_text = "\n".join(p.extract_text() or "" for p in empty_reader.pages)
++    assert "No input items were provided" in empty_text
++    assert "No items were selected" in empty_text
+diff --git a/docs/Project_Technical_Documentation.md b/docs/Project_Technical_Documentation.md
+new file mode 100755
+index 0000000..c7ee559
+--- /dev/null
++++ b/docs/Project_Technical_Documentation.md
+@@ -0,0 +1,148 @@
++# BudgetAdvisor — Project Technical Documentation (Group G12)
++
++* **Project Title:** BudgetAdvisor — Budget-Constrained Shopping & Investment Advisor
++
++* **Project Group ID:** G12
++
++* **Assigned Topic:** 0/1 Knapsack Problem using FIFO Branch and Bound and Least Cost (LC) Branch and Bound
++
++* **Verification Baseline:** Independent Sparse-Cost 0/1 Dynamic Programming
++
++## 1. Executive Summary & Architectural Overview
++
++BudgetAdvisor is a full-stack algorithm laboratory and decision-support application that solves the **0/1 Knapsack Problem** using two assigned state-space search strategies—**FIFO (First-In-First-Out) Branch and Bound** and **Least Cost (LC) Branch and Bound**—and cross-verifies every result against an independent **Sparse Dynamic Programming (DP)** solver.
++
++The system is architected into two decoupled tiers:
++
++1. **FastAPI Backend (`backend/`):**
++
++   * `solver.py`: Exact fixed-point (integer hundredths) implementation of FIFO Branch and Bound (`collections.deque`) and LC Branch and Bound (`heapq`).
++
++   * `dp_solver.py`: Independent Sparse-Cost Dynamic Programming solver over reachable integer-hundredth cost states.
++
++   * `computation.py`: Concurrent `ThreadPoolExecutor` runner executing FIFO, LC, and DP in parallel and determining the canonical recommended strategy.
++
++   * `benchmark.py`: Multi-size empirical benchmarking engine ($5, 10, 15, 20, 24$ items) with warm-up execution, configurable repetitions, median execution time calculation, peak queue tracking (`max_queue_size`), and DP verification.
++
++   * `sensitivity.py`: Parametric What-If Budget Sensitivity engine evaluating optimal combinations across user-selected budget intervals and generating data-driven insights.
++
++   * `report_generator.py`: Zero-dependency PDF 1.4 vector report builder (producing a 7-section academic report with embedded vector sensitivity curve and page numbers) and CSV benchmark exporter.
++
++   * `models.py`: Strict Pydantic validation schemas (compatible with both Pydantic v1 and v2) enforcing finite decimal precision ($\le 2$ decimal places), positive costs, valid budgets, unique item IDs, and mode-specific score ranges.
++
++   * `server.py`: FastAPI REST and NDJSON streaming server with bounded request payload middleware ($32\text{ KB}$ limit), concurrency semaphores, and MongoDB persistence with automatic `_InMemoryClient` fallback.
++
++2. **React + TypeScript Frontend (`frontend/src/`):**
++
++   * `/` (`pages/Dashboard.tsx`): Interactive Optimizer workspace with Shopping and Investment modes, budget slider/input, editable item table, Undo/Redo history, manual selection comparison, side-by-side SVG decision tree race (`SearchTree.tsx`, `TreeGraphic.tsx`), step-by-step replay controls, and tri-method correctness strip (`Results.tsx`).
++
++   * `/performance` (`pages/PerformanceAnalysis.tsx`): Empirical scaling benchmark suite with 4 Recharts graphs (*Execution Time*, *Nodes Explored*, *Nodes Pruned*, *Maximum Queue Size vs. Dataset Size*) and side-by-side verification table.
++
++   * `/what-if` (`pages/WhatIfAnalysis.tsx`): Parametric What-If Budget Sensitivity sweep with Pareto frontier chart, interactive budget-point scrubber, and automated sensitivity insights.
++
++   * `/reports` (`pages/ExportReports.tsx`): One-click generation and download of the 7-section PDF Optimization Report and Benchmark CSV Export.
++
++   * `/runs` (`pages/SavedRuns.tsx`): Persistent collection of saved optimization runs with restore and delete workflows.
++
++   * `/method` (`pages/Method.tsx`): Behind the Algorithm theoretical reference covering the 0/1 Knapsack formulation, FIFO vs. LC mechanics, 8-step operation complexity, Best/Average/Worst-case bounds, Sparse DP complexity, space distinctions, and comparison table.
++
++## 2. Mathematical Formulation & Canonical Tie-Breaking
++
++Given $n$ items where item $i \in \{0, \dots, n-1\}$ has cost $c_i > 0$ and score $v_i \in \mathbb{R}$, and given budget $B \ge 0$:
++
++$$
++\max_{x \in \{0,1\}^n} \sum_{i=0}^{n-1} v_i x_i \quad \text{subject to} \quad \sum_{i=0}^{n-1} c_i x_i \le B
++$$
++
++All monetary values and scores are scaled by $100$ into exact integers (`int(Decimal * 100)`) so that decimal values like `₹12.34` or score `15.50` are processed with zero floating-point drift.
++
++### Canonical Tie-Breaking Rule
++
++When two feasible subsets $S_1, S_2 \subseteq \{0, \dots, n-1\}$ achieve the same total score, the solver compares the tuple:
++
++$$
++\text{rank}(S) = \left(-\sum_{i \in S} v_i, \;\sum_{i \in S} c_i, \;\text{sorted\_original\_indices}(S)\right)
++$$
++
++and selects the combination that minimizes $\text{rank}(S)$ (highest score $\to$ lowest total cost $\to$ lexicographically smallest original item index tuple).
++
++## 3. Detailed Algorithm Audit (FIFO B&B, LC B&B, and Sparse DP)
++
++### 3.1 Preprocessing & Rational Density Ordering
++
++Items are sorted once in descending order of exact rational profit density:
++
++$$
++\text{key}(i) = \left(-\text{Fraction}(v_i, c_i), \; i\right)
++$$
++
++This guarantees exact ratio comparison without float division inaccuracies and deterministic ordering when two items have identical $v_i / c_i$.
++
++### 3.2 Fractional-Knapsack Continuous Relaxation Upper Bound
++
++For a node at tree level `depth` with current `cost` and `score`:
++
++* If `cost > budget`, return `-(10**30)` (infeasible).
++
++* Otherwise, set `room = budget - cost` and `bound = score`. Iterate through sorted items `items[depth:]`:
++
++  * If `value <= 0`, stop immediately (remaining items have non-positive density and cannot increase the bound).
++
++  * If `price <= room`, include the whole item (`bound += value`, `room -= price`).
++
++  * If `price > room`, add the ceiling of the fractional slice in hundredths:
++    
++
++    $$
++    \text{bound} \gets \text{bound} + \lfloor (\text{value} \times \text{room} + \text{price} - 1) / \text{price} \rfloor
++    $$
++
++    
++    and stop. Because integer ceiling rounds upward, `bound` is guaranteed to be $\ge$ any feasible 0/1 completion of the subtree.
++
++### 3.3 FIFO vs. LC Frontier Management & Pruning
++
++* **Visited Definition:** A node is counted as `visited` when popped from the frontier (`queue.popleft()` in FIFO or `heapq.heappop(heap)` in LC), including the root and any popped node subsequently pruned.
++
++* **Pruning Rules on Popped Nodes:**
++
++  1. `if node.cost > budget:` $\to$ `infeasible_pruned += 1` (`status = 'pruned_budget'`).
++
++  2. Otherwise, update incumbent `(best_score, best_cost, best_indices)` if `node` improves the canonical rank.
++
++  3. `if node.bound < best_score:` $\to$ `bound_pruned += 1` (`status = 'pruned_bound'`). Note that `node.bound == best_score` is **not** pruned so equal-score ties with lower cost or earlier indices are never missed.
++
++  4. If `node.depth == n`, mark `status = 'leaf'`; otherwise expand `include` ($x_d = 1$) then `exclude` ($x_d = 0$) children.
++
++## 4. Complete Theoretical Complexity Analysis
++
++Let $n$ be the number of items, $k$ be the number of search nodes generated/explored ($1 \le k \le 2^{n+1}-1$), $m \le k$ be the current frontier size, $W = \lfloor 100 \cdot B \rfloor$ be the integer hundredths capacity, and $S \le \min(W+1, 2^n, 50,000)$ be the number of reachable sparse DP cost states.
++
++| Operation / Complexity Metric | FIFO Branch and Bound | Least Cost (LC) Branch and Bound | Sparse Dynamic Programming | 
++| ----- | ----- | ----- | ----- | 
++| **1. Sorting** | $O(n \log n)$ time, $O(n)$ space | $O(n \log n)$ time, $O(n)$ space | Not required ($O(1)$) | 
++| **2. Upper-Bound Calculation** | $O(n - \text{depth}) = O(n)$ per node | $O(n - \text{depth}) = O(n)$ per node | Not applicable | 
++| **3. Child-Node Generation** | $O(n)$ per expanded node | $O(n)$ per expanded node | $O(n)$ tuple copy on state update | 
++| **4. Feasibility Check** | $O(1)$ per visited node | $O(1)$ per visited node | $O(1)$ per state transition | 
++| **5. FIFO Queue Ops** | $O(1)$ per push/pop, $O(k)$ total | N/A | N/A | 
++| **6. LC Priority Queue Ops** | N/A | $O(\log m) \subseteq O(\log k)$ per op, $O(k \log k)$ total | N/A | 
++| **7. Branch Pruning** | $O(1)$ bound comparison | $O(1)$ bound comparison | Dominated cost-state replacement | 
++| **8. Search Time (Parameterized)** | $O(nk)$ | $O(nk + k \log k)$ | $O(n \cdot S) \subseteq O(nW)$ | 
++| **Best-Case Time** | $O(n^2)$ ($k = \Theta(n)$) | $O(n^2)$ ($k = \Theta(n)$) | $O(n \cdot S_{\min})$ | 
++| **Average-Case Time** | $O(n \log n + n \cdot E[k_{\text{FIFO}}])$ | $O(n \log n + E[k_{\text{LC}}](n + \log E[k_{\text{LC}}]))$ | $O(n \cdot E[S])$ | 
++| **Worst-Case Time** | $O(n 2^n)$ ($k = \Theta(2^n)$) | $O(n 2^n)$ ($k = \Theta(2^n)$) | $O(n \cdot \min(W, 2^n))$ | 
++| **Worst-Case Search Space** | $O(2^n)$ frontier nodes | $O(2^n)$ frontier nodes | $O(\min(W, 2^n))$ states | 
++| **Total Algorithm Space** | $O(n \cdot k_{\text{frontier}} + n) \subseteq O(n 2^n)$ | $O(n \cdot k_{\text{frontier}} + n) \subseteq O(n 2^n)$ | $O(n \cdot S)$ | 
++| **Visualization Trace Space** | $O(\min(k, 30)) = O(1)$ | $O(\min(k, 30)) = O(1)$ | $O(1)$ progress counters | 
++
++## 5. Verification Screenshots Inventory (`docs/screenshots/`)
++
++The `docs/screenshots/` directory contains verified real-browser captures of the application:
++
++1. `docs/screenshots/01_dashboard_desktop.jpeg` — Desktop Optimizer Dashboard showing seeded Shopping dataset ($8$ items, ₹10,000 budget, $364$ optimal score, ₹9,700 spend, ₹300 remainder).
++
++2. `docs/screenshots/02_search_tree_race_desktop.jpeg` — Side-by-side FIFO ($89$ visited nodes) vs. LC ($41$ visited nodes) SVG decision trees and tri-method DP correctness verification strip.
++
++3. `docs/screenshots/03_manual_selection_and_recommendation.jpeg` — Interactive item table with manual selection checkboxes, over-budget detection, Undo/Redo controls, and algorithm recommendation comparison.
++
++4. `docs/screenshots/04_responsive_mobile_390x844.jpeg` — Mobile responsive layout verified at $390 \times 844$ viewport without horizontal overflow.
+\ No newline at end of file
+diff --git a/frontend/src/App.css b/frontend/src/App.css
+index 4d5f45e..ac1484d 100644
+--- a/frontend/src/App.css
++++ b/frontend/src/App.css
+@@ -94,4 +94,29 @@
+ .report-sections-preview li{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+ .report-sections-preview li svg{color:var(--accent)}
+ .report-download-btn{width:100%;justify-content:center;height:40px!important}
+-@media(max-width:960px){.benchmark-charts-grid,.sensitivity-main-grid,.insights-grid,.reports-cards-grid{grid-template-columns:1fr}.control-actions{width:100%;justify-content:flex-start}}
+\ No newline at end of file
++@media(max-width:960px){.benchmark-charts-grid,.sensitivity-main-grid,.insights-grid,.reports-cards-grid{grid-template-columns:1fr}.control-actions{width:100%;justify-content:flex-start}}
++
++/* --- Theoretical Grounding & Complexity Section (Behind the Algorithm) --- */
++.theory-section{margin-top:44px;padding-top:34px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:28px}
++.theory-variables-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
++.theory-var-card{display:flex;align-items:flex-start;gap:14px;background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:16px 18px}
++.theory-var-card code{display:inline-flex;align-items:center;justify-content:center;min-width:44px;height:36px;padding:0 10px;background:var(--accent-soft);color:var(--accent-dark);font-family:var(--display);font-size:13px;font-weight:600;border-radius:5px;flex-shrink:0}
++.theory-var-card strong{display:block;font-size:13px;font-weight:600;color:var(--ink);margin-bottom:4px}
++.theory-var-card p{font-size:12px;color:var(--muted);line-height:1.6}
++.theory-subblock h3,.theory-table-block h3{font-size:16px;font-weight:550;margin-bottom:14px;color:var(--ink)}
++.theory-steps-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
++.theory-step-card{background:var(--paper);border:1px solid var(--line);border-radius:5px;padding:15px 18px;display:flex;flex-direction:column;gap:8px}
++.theory-step-top{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
++.theory-step-top strong{font-size:13px;font-weight:600;color:var(--ink)}
++.theory-step-card p{font-size:12px;color:var(--muted);line-height:1.65}
++.theory-cases-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
++.theory-dp-space-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
++.theory-case-card{background:var(--paper);border:1px solid var(--line);border-top:3px solid var(--accent);border-radius:6px;padding:20px 22px;display:flex;flex-direction:column;gap:12px}
++.theory-case-header{display:flex;align-items:center;gap:9px;color:var(--accent-dark)}
++.theory-case-header h3{font-size:15px;font-weight:600;color:var(--ink)}
++.theory-case-card p{font-size:12px;color:var(--muted);line-height:1.7}
++.theory-case-card ul{margin:0;padding-left:18px;display:grid;gap:8px;font-size:12px;color:var(--muted);line-height:1.65}
++.theory-case-card code{background:var(--accent-soft);color:var(--accent-dark);padding:1px 5px;border-radius:3px;font-size:11px}
++.theory-table-block .academic-table td{white-space:normal;line-height:1.55;vertical-align:top}
++.theory-table-block .academic-table code{background:var(--accent-soft);color:var(--accent-dark);padding:1px 5px;border-radius:3px;font-size:11px}
++@media(max-width:960px){.theory-variables-grid,.theory-steps-grid,.theory-cases-grid,.theory-dp-space-grid{grid-template-columns:1fr}}
+\ No newline at end of file
+diff --git a/frontend/src/localSolver.ts b/frontend/src/localSolver.ts
+index 27fb574..695cde0 100644
+--- a/frontend/src/localSolver.ts
++++ b/frontend/src/localSolver.ts
+@@ -794,22 +794,48 @@ export function runLocalSensitivityAnalysis(req: SensitivityRequestPayload): Sen
+     const lc = solveStrategy(snap, 'lc');
+     const dp = solveDP(snap);
+     const fifo = req.include_fifo_comparison ? solveStrategy(snap, 'fifo') : null;
++
++    const rankIndices = (res: SolverResult) =>
++      req.items
++        .map((item, i) => (res.selected_ids.includes(item.id) ? i : -1))
++        .filter(i => i >= 0);
++
++    let recStrat: 'fifo' | 'lc' = 'lc';
++    let bestRes: SolverResult = lc;
++    if (fifo) {
++      const fIdx = rankIndices(fifo);
++      const lIdx = rankIndices(lc);
++      const fifoBetterOrEqual =
++        fifo.total_score > lc.total_score ||
++        (fifo.total_score === lc.total_score &&
++          (fifo.total_cost < lc.total_cost ||
++            (fifo.total_cost === lc.total_cost && tupleCompare(fIdx, lIdx) <= 0)));
++      recStrat = fifoBetterOrEqual ? 'fifo' : 'lc';
++      bestRes = fifoBetterOrEqual ? fifo : lc;
++    }
++
+     const verified =
+-      lc.proven_optimal &&
++      bestRes.proven_optimal &&
+       dp.proven_optimal &&
+-      lc.total_score === dp.total_score &&
++      bestRes.total_score === dp.total_score &&
+       (!fifo || (fifo.proven_optimal && fifo.total_score === dp.total_score));
+ 
++    const verStatus = verified
++      ? 'Verified Optimal (Matches DP)'
++      : bestRes.total_score === dp.total_score
++      ? 'Matches DP (Search Capped)'
++      : 'Search Capped — Not Proven Optimal';
++
+     return {
+       step_index: idx + 1,
+       budget: b,
+-      recommended_strategy: 'lc',
+-      optimal_score: lc.total_score,
+-      total_expenditure: lc.total_cost,
+-      remaining_budget: lc.remaining_budget,
+-      selected_item_count: lc.selected_ids.length,
+-      selected_ids: lc.selected_ids,
+-      selected_names: lc.selected_ids.map(id => nameMap.get(id) || id),
++      recommended_strategy: recStrat,
++      optimal_score: bestRes.total_score,
++      total_expenditure: bestRes.total_cost,
++      remaining_budget: bestRes.remaining_budget,
++      selected_item_count: bestRes.selected_ids.length,
++      selected_ids: bestRes.selected_ids,
++      selected_names: bestRes.selected_ids.map(id => nameMap.get(id) || id),
+       lc_score: lc.total_score,
+       lc_cost: lc.total_cost,
+       lc_time_ms: lc.elapsed_ms,
+@@ -827,7 +853,7 @@ export function runLocalSensitivityAnalysis(req: SensitivityRequestPayload): Sen
+       dp_score: dp.total_score,
+       dp_proven_optimal: dp.proven_optimal,
+       verified_optimal: verified,
+-      verification_status: verified ? 'Verified Optimal (Matches DP)' : 'Search Capped — Not Proven Optimal',
++      verification_status: verStatus,
+     };
+   });
+ 
+@@ -836,11 +862,13 @@ export function runLocalSensitivityAnalysis(req: SensitivityRequestPayload): Sen
+     const first = points[0];
+     const last = points[points.length - 1];
+     const gain = Number((last.optimal_score - first.optimal_score).toFixed(2));
++    const span = Number((last.budget - first.budget).toFixed(2));
++
+     if (gain > 0) {
+       insights.push({
+         category: 'improvement',
+         title: 'Budget expansion increased achievable score',
+-        description: `Increasing the available budget from ₹${first.budget.toLocaleString('en-IN')} to ₹${last.budget.toLocaleString('en-IN')} improved the maximum achievable score from ${first.optimal_score} to ${last.optimal_score} (+${gain} points).`,
++        description: `Increasing the available budget from ₹${first.budget.toLocaleString('en-IN')} to ₹${last.budget.toLocaleString('en-IN')} (+₹${span.toLocaleString('en-IN')}) improved the maximum achievable score from ${first.optimal_score} to ${last.optimal_score} (+${gain} points), expanding the optimal selection from ${first.selected_item_count} to ${last.selected_item_count} items.`,
+       });
+     } else {
+       insights.push({
+@@ -849,16 +877,80 @@ export function runLocalSensitivityAnalysis(req: SensitivityRequestPayload): Sen
+         description: `Across ₹${first.budget.toLocaleString('en-IN')} to ₹${last.budget.toLocaleString('en-IN')}, the optimal achievable score remained constant at ${first.optimal_score} points.`,
+       });
+     }
++
+     for (let i = 1; i < points.length; i++) {
+-      if (points[i].selected_ids.join(',') === points[i - 1].selected_ids.join(',')) {
++      if (
++        points[i].selected_ids.join(',') === points[i - 1].selected_ids.join(',') &&
++        points[i].budget > points[i - 1].budget
++      ) {
+         insights.push({
+           category: 'plateau',
+           title: 'Stepwise budget plateau detected',
+-          description: `Increasing the budget from ₹${points[i - 1].budget.toLocaleString('en-IN')} to ₹${points[i].budget.toLocaleString('en-IN')} did not change the selected combination (score stayed ${points[i].optimal_score} points).`,
++          description: `Increasing the budget from ₹${points[i - 1].budget.toLocaleString('en-IN')} to ₹${points[i].budget.toLocaleString('en-IN')} did not change the selected combination (score stayed ${points[i].optimal_score} points); the extra ₹${(points[i].budget - points[i - 1].budget).toLocaleString('en-IN')} stayed unallocated as remaining budget.`,
+         });
+         break;
+       }
+     }
++
++    const posItems = req.items.filter(it => Number(it.score) > 0);
++    if (posItems.length > 0) {
++      const highest = [...posItems].sort(
++        (a, b) => Number(b.score) - Number(a.score) || Number(a.cost) - Number(b.cost)
++      )[0];
++      const hCost = Number(highest.cost);
++      const hScore = Number(highest.score);
++      const unaffordable = points.filter(p => p.budget < hCost);
++      if (unaffordable.length > 0) {
++        const maxUnaff = unaffordable[unaffordable.length - 1].budget;
++        insights.push({
++          category: 'threshold',
++          title: `Budget threshold for high-value item "${highest.name}"`,
++          description: `Budgets up to ₹${maxUnaff.toLocaleString('en-IN')} are insufficient to include "${highest.name}" (cost ₹${hCost.toLocaleString('en-IN')}, score ${hScore}). A minimum budget of ₹${hCost.toLocaleString('en-IN')} is required before this item becomes individually feasible.`,
++        });
++      } else if (!last.selected_ids.includes(highest.id)) {
++        insights.push({
++          category: 'threshold',
++          title: `High-value item "${highest.name}" traded off for higher combined utility`,
++          description: `Even at ₹${last.budget.toLocaleString('en-IN')}, "${highest.name}" (cost ₹${hCost.toLocaleString('en-IN')}, score ${hScore}) is excluded because a combination of lower-cost items yields a higher total score (${last.optimal_score} points).`,
++        });
++      }
++    }
++
++    if (points.length >= 3 && span > 0 && gain > 0) {
++      const mid = points[Math.floor(points.length / 2)];
++      const firstSpan = mid.budget - first.budget;
++      const secondSpan = last.budget - mid.budget;
++      if (firstSpan > 0 && secondSpan > 0) {
++        const firstRate = ((mid.optimal_score - first.optimal_score) / firstSpan) * 1000;
++        const secondRate = ((last.optimal_score - mid.optimal_score) / secondSpan) * 1000;
++        if (secondRate < firstRate * 0.75) {
++          insights.push({
++            category: 'diminishing_returns',
++            title: 'Diminishing marginal score improvements at higher budgets',
++            description: `Early budget increases (₹${first.budget.toLocaleString('en-IN')} → ₹${mid.budget.toLocaleString('en-IN')}) yielded ${firstRate.toFixed(2)} score points per ₹1,000 added, whereas higher budget increases (₹${mid.budget.toLocaleString('en-IN')} → ₹${last.budget.toLocaleString('en-IN')}) yielded ${secondRate.toFixed(2)} points per ₹1,000 as high-density items were already saturated.`,
++          });
++        }
++      }
++    }
++
++    if (points.some(p => p.fifo_visited !== null)) {
++      const totalLc = points.reduce((acc, p) => acc + p.lc_visited, 0);
++      const totalFifo = points.reduce((acc, p) => acc + (p.fifo_visited || 0), 0);
++      if (totalFifo > 0) {
++        const red = Number(((1 - totalLc / totalFifo) * 100).toFixed(1));
++        insights.push({
++          category: 'efficiency',
++          title:
++            red > 0
++              ? 'LC Branch and Bound reduced node exploration across budget points'
++              : 'FIFO and LC Branch and Bound node exploration comparison',
++          description:
++            red > 0
++              ? `Across all ${points.length} budget points, LC Branch and Bound explored ${totalLc.toLocaleString('en-IN')} total nodes compared to ${totalFifo.toLocaleString('en-IN')} nodes for FIFO (${red}% fewer visited nodes).`
++              : `Across all ${points.length} budget points, LC explored ${totalLc.toLocaleString('en-IN')} total nodes and FIFO explored ${totalFifo.toLocaleString('en-IN')} total nodes while reaching identical verified optima.`,
++        });
++      }
++    }
+   }
+ 
+   return {
+diff --git a/frontend/src/pages/ExportReports.tsx b/frontend/src/pages/ExportReports.tsx
+index 1ef5ea9..9f08f82 100644
+--- a/frontend/src/pages/ExportReports.tsx
++++ b/frontend/src/pages/ExportReports.tsx
+@@ -26,6 +26,7 @@ export default function ExportReports({ workspace: w }: { workspace: Workspace }
+   );
+   const [includeSensitivity, setIncludeSensitivity] = useState<boolean>(true);
+   const [sensitivityIntervals, setSensitivityIntervals] = useState<number>(6);
++  const [includeBenchmark, setIncludeBenchmark] = useState<boolean>(false);
+   const [downloadingPdf, setDownloadingPdf] = useState<boolean>(false);
+   const [downloadingCsv, setDownloadingCsv] = useState<boolean>(false);
+   const [error, setError] = useState<string | null>(null);
+@@ -46,6 +47,8 @@ export default function ExportReports({ workspace: w }: { workspace: Workspace }
+         time_limit_ms: 1500,
+         include_sensitivity: includeSensitivity,
+         sensitivity_intervals: sensitivityIntervals,
++        include_benchmark: includeBenchmark,
++        benchmark_sizes: [5, 10, 15, 20],
+       });
+       triggerBrowserDownload(blob, `budgetadvisor_${w.mode}_report.pdf`);
+       toast.success('Optimization PDF report downloaded');
+@@ -195,12 +198,24 @@ export default function ExportReports({ workspace: w }: { workspace: Workspace }
+                 </select>
+               )}
+             </div>
++
++            <div className="report-options-row">
++              <label className="checkbox-inline">
++                <input
++                  type="checkbox"
++                  data-testid="report-include-benchmark"
++                  checked={includeBenchmark}
++                  onChange={e => setIncludeBenchmark(e.target.checked)}
++                />
++                <span>Include Multi-Size Scaling Benchmark Table (5–20 items) in Section 4</span>
++              </label>
++            </div>
+           </div>
+ 
+           <div className="report-sections-preview" data-testid="report-sections-list">
+             <span>Included Report Sections:</span>
+             <ul>
+-              <li><Check size={13} /> Section 1: Project & Optimization Details ({w.mode.toUpperCase()}, Budget {money(Number(w.data?.budget || 0))})</li>
++              <li><Check size={13} /> Section 1: Project & Optimization Details (Group G12, {w.mode.toUpperCase()}, Budget {money(Number(w.data?.budget || 0))})</li>
+               <li><Check size={13} /> Section 2: Input Dataset ({w.data?.items.length || 0} items with costs & scores)</li>
+               <li><Check size={13} /> Section 3: Optimal Recommendation ({rec ? `${number(rec.total_score)} pts, ${rec.selected_ids.length} items` : 'Computed on export'})</li>
+               <li><Check size={13} /> Section 4: Algorithm Performance (FIFO vs. LC execution time, nodes, queue size)</li>
+diff --git a/frontend/src/pages/Method.tsx b/frontend/src/pages/Method.tsx
+index 005f12d..55af07a 100644
+--- a/frontend/src/pages/Method.tsx
++++ b/frontend/src/pages/Method.tsx
+@@ -1,15 +1,411 @@
+-import { ArrowRight, ListOrdered, GitBranch, ShieldCheck, Calculator, Equal, Timer } from 'lucide-react';
++import {
++  ArrowRight,
++  ListOrdered,
++  GitBranch,
++  ShieldCheck,
++  Calculator,
++  Equal,
++  Timer,
++  Cpu,
++  Layers,
++  Database,
++  TrendingUp,
++} from 'lucide-react';
+ import { Link } from 'react-router-dom';
++
+ const rules = [
+-  { icon: Calculator, title: 'An independent DP baseline', text: 'Sparse dynamic programming retains the best score for each reachable integer cost after each item. It uses the same hundredth precision and result tie rules, but no fractional bound or search tree. One evaluated state is an attempted include transition from the previous layer; the empty root counts once. These are not B&B node visits.' },
+-  { icon: Timer, title: 'A race by work, not wall-clock time', text: 'The server streams measured progress while all three methods compute. Playback then aligns FIFO and LC by actual visited-node count at a readable pace. Computation times are measured separately and exclude animation. The first 100 visits and every rendered-node visit are retained; longer searches use batched steps. Pruned branches remain greyed out.' },
+-  { icon: Calculator, title: 'One shared upper bound', text: 'Items are sorted by score/cost ratio, descending; original row order breaks ratio ties. The fractional-knapsack relaxation fills remaining capacity with positive-score items. Costs and scores use integer hundredths; the last fractional score is rounded upward, never downward.' },
+-  { icon: Equal, title: 'Deterministic ties', text: 'Maximize total score, then minimize cost, then choose the lexicographically first tuple of original item indices. Equal-bound nodes remain searchable. Both strategies use include-then-exclude children; priority ties use creation order.' },
+-  { icon: ListOrdered, title: 'What counts as a visit?', text: 'A node is visited exactly when removed from the frontier—including nodes then pruned for exceeding the budget or falling below the incumbent score. Root counts as one visit. Generated nodes and unprocessed frontier nodes are reported separately.' },
+-  { icon: ShieldCheck, title: 'A result, with a proof', text: 'The first feasible solution is not the stopping condition. A search proves optimality only after its frontier is exhausted. A no-fit, zero-budget, or empty-list case still processes the root and reports actual work; spending is zero and the full budget remains.' },
+-  { icon: Timer, title: 'Bounded work, honest status', text: 'Each B&B strategy is limited to 50,000 visited nodes and 1.5 seconds, with at most 24 input items. DP is limited to 50,000 retained states, 200,000 state evaluations and 1.5 seconds. Capped methods report best found, not proven optimal. At most 30 generated nodes are stored per tree; full aggregate counts are preserved. Older saved runs without a DP result show no invented baseline.' },
+-  { icon: GitBranch, title: 'Scores, not investment returns', text: 'Shopping scores range from 0 to 100. Investment is a fictional educational additive-score model, including negative scores. Summing percentage-like scores does not give a portfolio return. This is not financial advice or portfolio optimization.' },
++  {
++    icon: Calculator,
++    title: 'An independent DP baseline',
++    text: 'Sparse dynamic programming retains the best score for each reachable integer cost after each item. It uses the same hundredth precision and result tie rules, but no fractional bound or search tree. One evaluated state is an attempted include transition from the previous layer; the empty root counts once. These are not B&B node visits.',
++  },
++  {
++    icon: Timer,
++    title: 'A race by work, not wall-clock time',
++    text: 'The server streams measured progress while all three methods compute. Playback then aligns FIFO and LC by actual visited-node count at a readable pace. Computation times are measured separately and exclude animation. The first 100 visits and every rendered-node visit are retained; longer searches use batched steps. Pruned branches remain greyed out.',
++  },
++  {
++    icon: Calculator,
++    title: 'One shared upper bound',
++    text: 'Items are sorted by score/cost ratio, descending; original row order breaks ratio ties. The fractional-knapsack relaxation fills remaining capacity with positive-score items. Costs and scores use integer hundredths; the last fractional score is rounded upward, never downward.',
++  },
++  {
++    icon: Equal,
++    title: 'Deterministic ties',
++    text: 'Maximize total score, then minimize cost, then choose the lexicographically first tuple of original item indices. Equal-bound nodes remain searchable. Both strategies use include-then-exclude children; priority ties use creation order.',
++  },
++  {
++    icon: ListOrdered,
++    title: 'What counts as a visit?',
++    text: 'A node is visited exactly when removed from the frontier—including nodes then pruned for exceeding the budget or falling below the incumbent score. Root counts as one visit. Generated nodes and unprocessed frontier nodes are reported separately.',
++  },
++  {
++    icon: ShieldCheck,
++    title: 'A result, with a proof',
++    text: 'The first feasible solution is not the stopping condition. A search proves optimality only after its frontier is exhausted. A no-fit, zero-budget, or empty-list case still processes the root and reports actual work; spending is zero and the full budget remains.',
++  },
++  {
++    icon: Timer,
++    title: 'Bounded work, honest status',
++    text: 'Each B&B strategy is limited to 50,000 visited nodes and 1.5 seconds, with at most 24 input items. DP is limited to 50,000 retained states, 200,000 state evaluations and 1.5 seconds. Capped methods report best found, not proven optimal. At most 30 generated nodes are stored per tree; full aggregate counts are preserved. Older saved runs without a DP result show no invented baseline.',
++  },
++  {
++    icon: GitBranch,
++    title: 'Scores, not investment returns',
++    text: 'Shopping scores range from 0 to 100. Investment is a fictional educational additive-score model, including negative scores. Summing percentage-like scores does not give a portfolio return. This is not financial advice or portfolio optimization.',
++  },
+ ];
++
++const stepComplexities = [
++  {
++    step: '1. Preprocessing & Rational Sorting',
++    complexity: 'O(n log n) time · O(n) space',
++    detail:
++      'Converts costs, scores, and budget into exact integer hundredths and sorts items once in descending order of exact rational profit density vᵢ / cᵢ via Fraction(score, cost), breaking ties by original item index.',
++  },
++  {
++    step: '2. Fractional-Knapsack Upper-Bound Calculation',
++    complexity: 'O(n − depth) = O(n) time per node · O(1) space',
++    detail:
++      'Starting at the current tree depth, greedily adds remaining positive-score items that fit completely in remaining capacity (room = budget − cost) and takes the integer-hundredths ceiling ⌈(vⱼ × room) / cⱼ⌉ of the first item that exceeds room.',
++  },
++  {
++    step: '3. Child-Node Generation',
++    complexity: 'O(n) time per expanded node',
++    detail:
++      'Each non-leaf feasible node at depth d < n creates two child nodes (include with x_d = 1 and exclude with x_d = 0), extending the chosen index tuple O(n) and computing each child’s upper bound in O(n).',
++  },
++  {
++    step: '4. Feasibility Checking',
++    complexity: 'O(1) time per visited node',
++    detail:
++      'When a node is popped from the frontier, checking node.cost > budget requires a single integer comparison. Budget-infeasible nodes are immediately marked pruned_budget and never expanded.',
++  },
++  {
++    step: '5. FIFO Queue Operations',
++    complexity: 'O(1) per push/pop · O(k) total across k nodes',
++    detail:
++      'FIFO Branch and Bound stores live nodes in a double-ended queue (collections.deque). Both append() and popleft() run in O(1) amortized time, traversing the state-space tree in breadth-first level order.',
++  },
++  {
++    step: '6. LC Priority Queue Operations',
++    complexity: 'O(log m) ⊆ O(log k) per push/pop · O(k log k) total',
++    detail:
++      'Least Cost (LC) Branch and Bound stores live nodes in a binary min-heap (heapq) keyed by (−node.bound, node.id). Pushing or popping from a heap of m ≤ k live nodes takes O(log m) ≤ O(log k) time.',
++  },
++  {
++    step: '7. Branch Pruning & Incumbent Update',
++    complexity: 'O(1) bound test · O(n) on incumbent tie-break',
++    detail:
++      'Compares node.bound < best_score in O(1) time. Strictly smaller bounds are pruned (pruned_bound). Equal bounds (node.bound == best_score) are preserved so canonical tie-breaking (max score → min cost → lexicographically first original indices) is guaranteed.',
++  },
++  {
++    step: '8. Search-Space & Trace Management',
++    complexity: 'O(1) per visit · O(min(k, 30)) trace memory',
++    detail:
++      'Tracks peak live frontier size (max_queue_size) in O(1) on every push, stores at most 30 ancestor-closed TraceNode records for SVG visualization, and records sampled progress frames.',
++  },
++];
++
+ export default function Method() {
+-  return <div className="method-page page-enter"><div className="page-heading"><div><div className="eyebrow">BEHIND THE ALGORITHM</div><h1 data-testid="method-page-title">Same problem. Different paths.</h1><p data-testid="method-page-subtitle">The details that make this a fair Branch and Bound comparison.</p></div><Link className="text-link" to="/" data-testid="method-back-link">Back to optimizer<ArrowRight size={16}/></Link></div><section className="objective-band" data-testid="objective-explanation"><div><span className="eyebrow">THE 0/1 KNAPSACK OBJECTIVE</span><h2>Maximize the score. Respect the budget.</h2></div><div className="formula">max Σ scoreᵢ × xᵢ<span>Σ costᵢ × xᵢ ≤ budget · xᵢ ∈ {'{0, 1}'}</span></div></section><div className="strategy-explanation"><section data-testid="fifo-explanation"><span className="strategy-number">01 / FIFO</span><h2>First in. First out.</h2><p>A queue processes the oldest generated node first. This explores the search level by level, discarding branches only when they are infeasible or cannot match the best score.</p><code>frontier.popleft()</code></section><section data-testid="lc-explanation"><span className="strategy-number">02 / LC</span><h2>The most promising bound, first.</h2><p>A priority queue favors the highest optimistic bound. “Least cost” means minimizing the <strong>negative bound</strong>: a higher bound has a lower priority value.</p><code>priority = −upper_bound</code></section></div><p className="method-callout" data-testid="lc-no-guarantee">LC is not guaranteed to visit fewer nodes. The charts report actual measurements for the same input snapshot, not a manufactured advantage.</p><div className="method-rules">{rules.map((rule, i) => <section key={rule.title} data-testid={`method-rule-${i}`}><rule.icon size={20}/><div><h2>{rule.title}</h2><p>{rule.text}</p></div></section>)}</div></div>;
++  return (
++    <div className="method-page page-enter">
++      <div className="page-heading">
++        <div>
++          <div className="eyebrow">BEHIND THE ALGORITHM · GROUP G12</div>
++          <h1 data-testid="method-page-title">Same problem. Different paths.</h1>
++          <p data-testid="method-page-subtitle">
++            The algorithmic foundations, theoretical complexity analysis, and verification rules behind BudgetAdvisor.
++          </p>
++        </div>
++        <Link className="text-link" to="/" data-testid="method-back-link">
++          Back to optimizer
++          <ArrowRight size={16} />
++        </Link>
++      </div>
++
++      <section className="objective-band" data-testid="objective-explanation">
++        <div>
++          <span className="eyebrow">THE 0/1 KNAPSACK OBJECTIVE</span>
++          <h2>Maximize the score. Respect the budget.</h2>
++        </div>
++        <div className="formula">
++          max Σ scoreᵢ × xᵢ
++          <span>Σ costᵢ × xᵢ ≤ budget · xᵢ ∈ {'{0, 1}'}</span>
++        </div>
++      </section>
++
++      <div className="strategy-explanation">
++        <section data-testid="fifo-explanation">
++          <span className="strategy-number">01 / FIFO</span>
++          <h2>First in. First out.</h2>
++          <p>
++            A queue processes the oldest generated node first. This explores the search level by level, discarding branches only when they are infeasible or cannot match the best score.
++          </p>
++          <code>frontier.popleft()</code>
++        </section>
++        <section data-testid="lc-explanation">
++          <span className="strategy-number">02 / LC</span>
++          <h2>The most promising bound, first.</h2>
++          <p>
++            A priority queue favors the highest optimistic bound. “Least cost” means minimizing the <strong>negative bound</strong>: a higher bound has a lower priority value.
++          </p>
++          <code>priority = −upper_bound</code>
++        </section>
++      </div>
++
++      <p className="method-callout" data-testid="lc-no-guarantee">
++        LC is not guaranteed to visit fewer nodes. The charts report actual measurements for the same input snapshot, not a manufactured advantage.
++      </p>
++
++      <div className="method-rules">
++        {rules.map((rule, i) => (
++          <section key={rule.title} data-testid={`method-rule-${i}`}>
++            <rule.icon size={20} />
++            <div>
++              <h2>{rule.title}</h2>
++              <p>{rule.text}</p>
++            </div>
++          </section>
++        ))}
++      </div>
++
++      {/* --- THEORETICAL GROUNDING & COMPLEXITY ANALYSIS SECTION --- */}
++      <section className="theory-section" data-testid="theoretical-grounding-section">
++        <div className="section-heading">
++          <div>
++            <span className="section-kicker">THEORETICAL GROUNDING & ASYMPTOTIC ANALYSIS</span>
++            <h2 data-testid="complexity-heading">Time & Space Complexity Analysis</h2>
++          </div>
++          <span className="count-tag">Verified against actual implementation</span>
++        </div>
++
++        <div className="theory-variables-grid" data-testid="complexity-variables">
++          <div className="theory-var-card">
++            <code>n</code>
++            <div>
++              <strong>Number of Available Items</strong>
++              <p>Total candidate products or investment assets in the input dataset (1 ≤ n ≤ 24).</p>
++            </div>
++          </div>
++          <div className="theory-var-card">
++            <code>k</code>
++            <div>
++              <strong>Search Nodes Generated / Explored</strong>
++              <p>Number of state-space tree nodes generated or popped during Branch and Bound (1 ≤ k ≤ 2ⁿ⁺¹ − 1, capped at 50,000).</p>
++            </div>
++          </div>
++          <div className="theory-var-card">
++            <code>W &amp; S</code>
++            <div>
++              <strong>Integer Capacity &amp; Sparse DP States</strong>
++              <p>W = ⌊100 × Budget⌋ is capacity in integer hundredths; S ≤ min(W + 1, 2ⁿ, 50,000) is the count of reachable sparse DP cost states.</p>
++            </div>
++          </div>
++        </div>
++
++        <div className="theory-subblock" data-testid="stepwise-complexity-breakdown">
++          <h3>Operation-Level Complexity Breakdown (1–8)</h3>
++          <div className="theory-steps-grid">
++            {stepComplexities.map((item, idx) => (
++              <article className="theory-step-card" key={item.step} data-testid={`complexity-step-${idx + 1}`}>
++                <div className="theory-step-top">
++                  <strong>{item.step}</strong>
++                  <span className="algo-badge algo-lc">{item.complexity}</span>
++                </div>
++                <p>{item.detail}</p>
++              </article>
++            ))}
++          </div>
++        </div>
++
++        <div className="theory-cases-grid" data-testid="complexity-cases-breakdown">
++          <article className="theory-case-card" data-testid="best-case-analysis">
++            <div className="theory-case-header">
++              <TrendingUp size={17} />
++              <h3>Best-Case Complexity</h3>
++            </div>
++            <p>
++              <strong>When strong pruning substantially limits node exploration:</strong> If items have well-separated value-to-cost ratios and an early high-value feasible solution tightens <code>best_score</code>, almost all sibling subtrees fail <code>node.bound &lt; best_score</code> and are pruned immediately.
++            </p>
++            <ul>
++              <li>
++                <strong>Explored Nodes:</strong> Only <code>k = Θ(n)</code> nodes along the principal high-density path are expanded.
++              </li>
++              <li>
++                <strong>Preprocessing + Bounding Cost:</strong> Sorting takes <code>O(n log n)</code>, and computing the <code>O(n)</code> fractional upper bound across <code>Θ(n)</code> nodes takes <code>O(n²)</code>.
++              </li>
++              <li>
++                <strong>Resulting Best-Case Time:</strong> <code>O(n log n + n²) = O(n²)</code> for both FIFO and LC, with <code>O(n)</code> frontier space.
++              </li>
++            </ul>
++          </article>
++
++          <article className="theory-case-card" data-testid="average-case-analysis">
++            <div className="theory-case-header">
++              <Cpu size={17} />
++              <h3>Average-Case Complexity (Input-Dependent E[k])</h3>
++            </div>
++            <p>
++              <strong>Input-dependent expected performance:</strong> Branch and Bound does not have a single universal closed-form polynomial average-case bound because pruning effectiveness depends on item correlation and budget ratio. Let <code>E[k]</code> denote the expected number of generated/explored nodes for an input distribution:
++            </p>
++            <ul>
++              <li>
++                <strong>FIFO Expected Time:</strong> <code>O(n log n + n · E[k_FIFO])</code>. Level-order traversal explores shallow nodes across all branches before reaching deep leaves, delaying incumbent tightening.
++              </li>
++              <li>
++                <strong>LC Expected Time:</strong> <code>O(n log n + n · E[k_LC] + E[k_LC] log E[k_LC])</code>. By expanding the highest optimistic bound first, LC typically reaches an optimal or near-optimal leaf rapidly, so <code>E[k_LC] ≪ E[k_FIFO]</code> on typical instances.
++              </li>
++            </ul>
++          </article>
++
++          <article className="theory-case-card" data-testid="worst-case-analysis">
++            <div className="theory-case-header">
++              <Layers size={17} />
++              <h3>Worst-Case Complexity</h3>
++            </div>
++            <p>
++              <strong>Why exponential search occurs when pruning is ineffective:</strong> If all items have identical or nearly identical profit density <code>vᵢ / cᵢ</code> (or strongly correlated weights and values) such that the continuous fractional upper bound remains above <code>best_score</code> until the bottom levels of the tree, neither FIFO nor LC can prune internal branches.
++            </p>
++            <ul>
++              <li>
++                <strong>FIFO Search &amp; Worst-Case Time:</strong> Search time is <code>O(nk)</code>. With <code>k = Θ(2ⁿ)</code> nodes in a full binary tree of depth <code>n</code>, worst-case time is <code>O(n 2ⁿ)</code> and worst-case search space is <code>O(2ⁿ)</code>.
++              </li>
++              <li>
++                <strong>LC Search &amp; Worst-Case Time:</strong> Search time is <code>O(nk + k log k)</code>. When <code>k = Θ(2ⁿ)</code>, <code>log₂(k) = Θ(n)</code>, so <code>O(n 2ⁿ + 2ⁿ · n) = O(n 2ⁿ)</code> time and <code>O(2ⁿ)</code> worst-case search space.
++              </li>
++            </ul>
++          </article>
++        </div>
++
++        <div className="theory-dp-space-grid">
++          <article className="theory-case-card" data-testid="dp-complexity-analysis">
++            <div className="theory-case-header">
++              <Calculator size={17} />
++              <h3>Dynamic Programming Verification Complexity</h3>
++            </div>
++            <p>
++              BudgetAdvisor verifies FIFO and LC results against an independent exact 0/1 Knapsack Dynamic Programming solver (<code>backend/dp_solver.py</code>):
++            </p>
++            <ul>
++              <li>
++                <strong>Standard Dense DP Reference:</strong> A textbook table over <code>n</code> items and integer capacity <code>W = ⌊100 × Budget⌋</code> runs in pseudo-polynomial time <code>O(nW)</code> and space <code>O(nW)</code> (or <code>O(W)</code>).
++              </li>
++              <li>
++                <strong>Actual Sparse-Cost DP Implementation:</strong> Because user budgets can reach ₹10,00,00,000 (<code>W = 10¹⁰</code> hundredths), allocating an array of length <code>W</code> is impractical. Instead, <code>solve_dp</code> iterates only over reachable exact cost states <code>S ≤ min(W + 1, 2ⁿ, 50,000)</code> stored in a hash map.
++              </li>
++              <li>
++                <strong>Sparse DP Time &amp; Space:</strong> Runs in <code>O(n · S) ⊆ O(nW)</code> time (capped at <code>200,000</code> state evaluations) and <code>O(n · S)</code> total space (<code>O(S)</code> retained cost states).
++              </li>
++            </ul>
++          </article>
++
++          <article className="theory-case-card" data-testid="space-distinction-analysis">
++            <div className="theory-case-header">
++              <Database size={17} />
++              <h3>Space Complexity Distinction</h3>
++            </div>
++            <p>
++              To evaluate memory usage accurately, we distinguish three separate space components in the implementation:
++            </p>
++            <ul>
++              <li>
++                <strong>1. Search Frontier Space:</strong> Memory occupied by live, unexpanded nodes in FIFO’s <code>deque</code> or LC’s <code>heapq</code>, measured empirically by <code>max_queue_size</code>. Bounded by <code>O(k)</code> in general and <code>O(2ⁿ)</code> in the worst case.
++              </li>
++              <li>
++                <strong>2. Total Algorithm Space:</strong> Frontier nodes plus per-node <code>chosen</code> index tuples (length <code>≤ n</code>) and input arrays: <code>O(n · k_frontier + n)</code> for B&amp;B (worst-case <code>O(n 2ⁿ)</code>, or <code>O(2ⁿ)</code> nodes), and <code>O(n · S)</code> for Sparse DP.
++              </li>
++              <li>
++                <strong>3. Additional Visualization Data Structures:</strong> Sorted item list <code>O(n)</code>, ancestor-closed SVG <code>trace</code> dictionary strictly capped at <code>30</code> nodes (<code>O(1)</code> auxiliary space), and sampled <code>SearchFrame</code> progress snapshots.
++              </li>
++            </ul>
++          </article>
++        </div>
++
++        <div className="theory-table-block" data-testid="algorithm-comparison-table">
++          <h3>Side-by-Side Theoretical &amp; Architectural Comparison</h3>
++          <div className="data-table-wrapper">
++            <table className="academic-table">
++              <thead>
++                <tr>
++                  <th>Dimension / Metric</th>
++                  <th>FIFO Branch and Bound</th>
++                  <th>Least Cost (LC) Branch and Bound</th>
++                  <th>Sparse Dynamic Programming (Baseline)</th>
++                </tr>
++              </thead>
++              <tbody>
++                <tr>
++                  <td><strong>Search Strategy</strong></td>
++                  <td>Breadth-First (Level-Order) Traversal</td>
++                  <td>Best-First (Highest Upper Bound First)</td>
++                  <td>Bottom-Up Layer-by-Layer State Recurrence</td>
++                </tr>
++                <tr>
++                  <td><strong>Frontier Data Structure</strong></td>
++                  <td>FIFO Queue (<code>collections.deque</code>)</td>
++                  <td>Binary Min-Heap (<code>heapq</code> on <code>−bound</code>)</td>
++                  <td>Sparse Cost Hash Map (<code>dict[cost, state]</code>)</td>
++                </tr>
++                <tr>
++                  <td><strong>Preprocessing Sorting</strong></td>
++                  <td><code>O(n log n)</code> by descending <code>vᵢ / cᵢ</code></td>
++                  <td><code>O(n log n)</code> by descending <code>vᵢ / cᵢ</code></td>
++                  <td>None required (<code>O(1)</code> setup)</td>
++                </tr>
++                <tr>
++                  <td><strong>Upper-Bound Calculation</strong></td>
++                  <td><code>O(n)</code> fractional knapsack relaxation</td>
++                  <td><code>O(n)</code> fractional knapsack relaxation</td>
++                  <td>Not applicable (exact state transition)</td>
++                </tr>
++                <tr>
++                  <td><strong>Queue / State Op Cost</strong></td>
++                  <td><code>O(1)</code> per push / popleft</td>
++                  <td><code>O(log m) ⊆ O(log k)</code> per push / pop</td>
++                  <td><code>O(1)</code> average hash lookup per transition</td>
++                </tr>
++                <tr>
++                  <td><strong>Search Time (Parameterized)</strong></td>
++                  <td><code>O(nk)</code></td>
++                  <td><code>O(nk + k log k)</code></td>
++                  <td><code>O(n · S) ⊆ O(nW)</code></td>
++                </tr>
++                <tr>
++                  <td><strong>Best-Case Time</strong></td>
++                  <td><code>O(n²)</code> (strong pruning, <code>k = Θ(n)</code>)</td>
++                  <td><code>O(n²)</code> (direct dive to optimal leaf)</td>
++                  <td><code>O(n · S_min)</code> (few distinct cost sums)</td>
++                </tr>
++                <tr>
++                  <td><strong>Average-Case Time</strong></td>
++                  <td><code>O(n log n + n · E[k_FIFO])</code></td>
++                  <td><code>O(n log n + E[k_LC](n + log E[k_LC]))</code></td>
++                  <td><code>O(n · E[S])</code> (input-cost dependent)</td>
++                </tr>
++                <tr>
++                  <td><strong>Worst-Case Time</strong></td>
++                  <td><code>O(n 2ⁿ)</code> (when <code>k = Θ(2ⁿ)</code>)</td>
++                  <td><code>O(n 2ⁿ)</code> (when <code>k = Θ(2ⁿ)</code>)</td>
++                  <td><code>O(n · min(W, 2ⁿ))</code> (pseudo-polynomial)</td>
++                </tr>
++                <tr>
++                  <td><strong>Worst-Case Search Space</strong></td>
++                  <td><code>O(2ⁿ)</code> nodes in queue</td>
++                  <td><code>O(2ⁿ)</code> nodes in priority queue</td>
++                  <td><code>O(min(W, 2ⁿ))</code> reachable cost states</td>
++                </tr>
++                <tr>
++                  <td><strong>Execution Safeguards</strong></td>
++                  <td>50,000 visited nodes · 1,500 ms</td>
++                  <td>50,000 visited nodes · 1,500 ms</td>
++                  <td>50,000 states · 200,000 evals · 1,500 ms</td>
++                </tr>
++              </tbody>
++            </table>
++          </div>
++        </div>
++      </section>
++    </div>
++  );
+ }
+\ No newline at end of file

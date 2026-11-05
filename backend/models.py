@@ -437,6 +437,22 @@ class ReportExportRequest(CompatModel):
                 raise ValueError('Item IDs must be unique.')
             if self.mode == 'shopping' and any(not 0 <= i.score <= 100 for i in self.items):
                 raise ValueError('Shopping scores must be between 0 and 100.')
+            if self.sensitivity_min_budget is not None:
+                _validate_finite_decimal(self.sensitivity_min_budget, 2, ge=Decimal('0'), le=Decimal('100000000'))
+            if self.sensitivity_max_budget is not None:
+                _validate_finite_decimal(self.sensitivity_max_budget, 2, ge=Decimal('0'), le=Decimal('100000000'))
+            if (
+                self.sensitivity_min_budget is not None
+                and self.sensitivity_max_budget is not None
+                and self.sensitivity_max_budget < self.sensitivity_min_budget
+            ):
+                raise ValueError('sensitivity_max_budget must be greater than or equal to sensitivity_min_budget.')
+            if self.include_benchmark:
+                if not self.benchmark_sizes or len(self.benchmark_sizes) > 10:
+                    raise ValueError('Provide between 1 and 10 benchmark sizes.')
+                for s in self.benchmark_sizes:
+                    if not (1 <= s <= 24):
+                        raise ValueError('Benchmark dataset sizes must be between 1 and 24 items.')
             return self
     else:
         @_v1_validator('budget', pre=True)
@@ -457,4 +473,21 @@ class ReportExportRequest(CompatModel):
                 raise ValueError('Item IDs must be unique.')
             if mode == 'shopping' and any(not 0 <= i.score <= 100 for i in items):
                 raise ValueError('Shopping scores must be between 0 and 100.')
+            s_min = values.get('sensitivity_min_budget')
+            s_max = values.get('sensitivity_max_budget')
+            if s_min is not None:
+                s_min = _validate_finite_decimal(s_min, 2, ge=Decimal('0'), le=Decimal('100000000'))
+                values['sensitivity_min_budget'] = s_min
+            if s_max is not None:
+                s_max = _validate_finite_decimal(s_max, 2, ge=Decimal('0'), le=Decimal('100000000'))
+                values['sensitivity_max_budget'] = s_max
+            if s_min is not None and s_max is not None and s_max < s_min:
+                raise ValueError('sensitivity_max_budget must be greater than or equal to sensitivity_min_budget.')
+            if values.get('include_benchmark'):
+                b_sizes = values.get('benchmark_sizes') or []
+                if not b_sizes or len(b_sizes) > 10:
+                    raise ValueError('Provide between 1 and 10 benchmark sizes.')
+                for s in b_sizes:
+                    if not (1 <= s <= 24):
+                        raise ValueError('Benchmark dataset sizes must be between 1 and 24 items.')
             return values

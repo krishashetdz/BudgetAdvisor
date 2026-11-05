@@ -95,3 +95,28 @@
 .report-sections-preview li svg{color:var(--accent)}
 .report-download-btn{width:100%;justify-content:center;height:40px!important}
 @media(max-width:960px){.benchmark-charts-grid,.sensitivity-main-grid,.insights-grid,.reports-cards-grid{grid-template-columns:1fr}.control-actions{width:100%;justify-content:flex-start}}
+
+/* --- Theoretical Grounding & Complexity Section (Behind the Algorithm) --- */
+.theory-section{margin-top:44px;padding-top:34px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:28px}
+.theory-variables-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.theory-var-card{display:flex;align-items:flex-start;gap:14px;background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:16px 18px}
+.theory-var-card code{display:inline-flex;align-items:center;justify-content:center;min-width:44px;height:36px;padding:0 10px;background:var(--accent-soft);color:var(--accent-dark);font-family:var(--display);font-size:13px;font-weight:600;border-radius:5px;flex-shrink:0}
+.theory-var-card strong{display:block;font-size:13px;font-weight:600;color:var(--ink);margin-bottom:4px}
+.theory-var-card p{font-size:12px;color:var(--muted);line-height:1.6}
+.theory-subblock h3,.theory-table-block h3{font-size:16px;font-weight:550;margin-bottom:14px;color:var(--ink)}
+.theory-steps-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.theory-step-card{background:var(--paper);border:1px solid var(--line);border-radius:5px;padding:15px 18px;display:flex;flex-direction:column;gap:8px}
+.theory-step-top{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.theory-step-top strong{font-size:13px;font-weight:600;color:var(--ink)}
+.theory-step-card p{font-size:12px;color:var(--muted);line-height:1.65}
+.theory-cases-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+.theory-dp-space-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.theory-case-card{background:var(--paper);border:1px solid var(--line);border-top:3px solid var(--accent);border-radius:6px;padding:20px 22px;display:flex;flex-direction:column;gap:12px}
+.theory-case-header{display:flex;align-items:center;gap:9px;color:var(--accent-dark)}
+.theory-case-header h3{font-size:15px;font-weight:600;color:var(--ink)}
+.theory-case-card p{font-size:12px;color:var(--muted);line-height:1.7}
+.theory-case-card ul{margin:0;padding-left:18px;display:grid;gap:8px;font-size:12px;color:var(--muted);line-height:1.65}
+.theory-case-card code{background:var(--accent-soft);color:var(--accent-dark);padding:1px 5px;border-radius:3px;font-size:11px}
+.theory-table-block .academic-table td{white-space:normal;line-height:1.55;vertical-align:top}
+.theory-table-block .academic-table code{background:var(--accent-soft);color:var(--accent-dark);padding:1px 5px;border-radius:3px;font-size:11px}
+@media(max-width:960px){.theory-variables-grid,.theory-steps-grid,.theory-cases-grid,.theory-dp-space-grid{grid-template-columns:1fr}}

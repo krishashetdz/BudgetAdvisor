@@ -1,8 +1,38 @@
-"""Independent sparse-cost 0/1 DP, exact to hundredths; no budget-sized array.
+"""Independent Sparse-Cost 0/1 Dynamic Programming Verification Solver.
 
-One state evaluation is an include transition from a prior-layer cost state,
-including rejected over-budget transitions; the initial empty state counts once.
-Limits avoid exponential sparse-state growth without ever claiming a partial proof.
+Project Group ID: G12
+Purpose: Independently computes and verifies the exact 0/1 Knapsack optimal value
+and canonical item combination without using fractional upper bounds or search trees.
+
+Theoretical Complexity Analysis
+-------------------------------
+Let:
+  - n = number of available items (0 <= n <= 24).
+  - W = integer budget capacity in hundredths (W = int(budget * 100)).
+  - S = number of reachable distinct cost states in `states` (1 <= S <= min(W + 1, 2^n, MAX_STATES)).
+
+1. Standard Dense DP vs. Sparse-Cost DP:
+   - A textbook dense 0/1 Knapsack DP allocates a table of size (n + 1) x (W + 1),
+     requiring O(nW) pseudo-polynomial time and O(nW) (or O(W)) memory. Because budgets
+     in BudgetAdvisor can reach Rs. 10,00,00,000 (W = 10^10 hundredths), a dense array of
+     size W is memory-prohibitive.
+   - Instead, `solve_dp` maintains a sparse hash map `states: dict[int, tuple[int, tuple[int, ...]]]`
+     mapping each reachable exact cost `c <= W` to its best `(score, chosen_indices)`.
+
+2. Time & Space Complexity:
+   - Time Complexity: O(n * S) <= O(n * min(W + 1, 2^n, MAX_STATES)) state transitions,
+     bounded by `MAX_EVALUATIONS = 200,000` and `request.time_limit_ms`.
+   - Retained State Space: O(S) entries in `states` (capped at `MAX_STATES = 50,000`).
+   - Total Algorithm Space: O(n * S) including the `chosen` index tuple of length <= n
+     stored per reachable cost state, plus O(S) for the per-item snapshot `previous`.
+
+3. Canonical Tie-Breaking & Honest Safeguards:
+   - At identical cost `next_cost`, a transition replaces the incumbent only if
+     `(-candidate_score, candidate_indices) < (-old_score, old_indices)`.
+   - Across all reachable costs at completion, the solver selects `min(states.items())`
+     by `(-score, cost, chosen_indices)`, matching FIFO and LC Branch and Bound.
+   - If `MAX_STATES`, `MAX_EVALUATIONS`, or `time_limit_ms` is reached, `proven_optimal`
+     is set to `False` with an explicit `stop_reason`.
 """
 from time import perf_counter
 from models import SolveRequest, DPResult

@@ -794,22 +794,48 @@ export function runLocalSensitivityAnalysis(req: SensitivityRequestPayload): Sen
     const lc = solveStrategy(snap, 'lc');
     const dp = solveDP(snap);
     const fifo = req.include_fifo_comparison ? solveStrategy(snap, 'fifo') : null;
+
+    const rankIndices = (res: SolverResult) =>
+      req.items
+        .map((item, i) => (res.selected_ids.includes(item.id) ? i : -1))
+        .filter(i => i >= 0);
+
+    let recStrat: 'fifo' | 'lc' = 'lc';
+    let bestRes: SolverResult = lc;
+    if (fifo) {
+      const fIdx = rankIndices(fifo);
+      const lIdx = rankIndices(lc);
+      const fifoBetterOrEqual =
+        fifo.total_score > lc.total_score ||
+        (fifo.total_score === lc.total_score &&
+          (fifo.total_cost < lc.total_cost ||
+            (fifo.total_cost === lc.total_cost && tupleCompare(fIdx, lIdx) <= 0)));
+      recStrat = fifoBetterOrEqual ? 'fifo' : 'lc';
+      bestRes = fifoBetterOrEqual ? fifo : lc;
+    }
+
     const verified =
-      lc.proven_optimal &&
+      bestRes.proven_optimal &&
       dp.proven_optimal &&
-      lc.total_score === dp.total_score &&
+      bestRes.total_score === dp.total_score &&
       (!fifo || (fifo.proven_optimal && fifo.total_score === dp.total_score));
+
+    const verStatus = verified
+      ? 'Verified Optimal (Matches DP)'
+      : bestRes.total_score === dp.total_score
+      ? 'Matches DP (Search Capped)'
+      : 'Search Capped — Not Proven Optimal';
 
     return {
       step_index: idx + 1,
       budget: b,
-      recommended_strategy: 'lc',
-      optimal_score: lc.total_score,
-      total_expenditure: lc.total_cost,
-      remaining_budget: lc.remaining_budget,
-      selected_item_count: lc.selected_ids.length,
-      selected_ids: lc.selected_ids,
-      selected_names: lc.selected_ids.map(id => nameMap.get(id) || id),
+      recommended_strategy: recStrat,
+      optimal_score: bestRes.total_score,
+      total_expenditure: bestRes.total_cost,
+      remaining_budget: bestRes.remaining_budget,
+      selected_item_count: bestRes.selected_ids.length,
+      selected_ids: bestRes.selected_ids,
+      selected_names: bestRes.selected_ids.map(id => nameMap.get(id) || id),
       lc_score: lc.total_score,
       lc_cost: lc.total_cost,
       lc_time_ms: lc.elapsed_ms,
@@ -827,7 +853,7 @@ export function runLocalSensitivityAnalysis(req: SensitivityRequestPayload): Sen
       dp_score: dp.total_score,
       dp_proven_optimal: dp.proven_optimal,
       verified_optimal: verified,
-      verification_status: verified ? 'Verified Optimal (Matches DP)' : 'Search Capped — Not Proven Optimal',
+      verification_status: verStatus,
     };
   });
 
@@ -836,11 +862,13 @@ export function runLocalSensitivityAnalysis(req: SensitivityRequestPayload): Sen
     const first = points[0];
     const last = points[points.length - 1];
     const gain = Number((last.optimal_score - first.optimal_score).toFixed(2));
+    const span = Number((last.budget - first.budget).toFixed(2));
+
     if (gain > 0) {
       insights.push({
         category: 'improvement',
         title: 'Budget expansion increased achievable score',
-        description: `Increasing the available budget from ₹${first.budget.toLocaleString('en-IN')} to ₹${last.budget.toLocaleString('en-IN')} improved the maximum achievable score from ${first.optimal_score} to ${last.optimal_score} (+${gain} points).`,
+        description: `Increasing the available budget from ₹${first.budget.toLocaleString('en-IN')} to ₹${last.budget.toLocaleString('en-IN')} (+₹${span.toLocaleString('en-IN')}) improved the maximum achievable score from ${first.optimal_score} to ${last.optimal_score} (+${gain} points), expanding the optimal selection from ${first.selected_item_count} to ${last.selected_item_count} items.`,
       });
     } else {
       insights.push({
@@ -849,14 +877,78 @@ export function runLocalSensitivityAnalysis(req: SensitivityRequestPayload): Sen
         description: `Across ₹${first.budget.toLocaleString('en-IN')} to ₹${last.budget.toLocaleString('en-IN')}, the optimal achievable score remained constant at ${first.optimal_score} points.`,
       });
     }
+
     for (let i = 1; i < points.length; i++) {
-      if (points[i].selected_ids.join(',') === points[i - 1].selected_ids.join(',')) {
+      if (
+        points[i].selected_ids.join(',') === points[i - 1].selected_ids.join(',') &&
+        points[i].budget > points[i - 1].budget
+      ) {
         insights.push({
           category: 'plateau',
           title: 'Stepwise budget plateau detected',
-          description: `Increasing the budget from ₹${points[i - 1].budget.toLocaleString('en-IN')} to ₹${points[i].budget.toLocaleString('en-IN')} did not change the selected combination (score stayed ${points[i].optimal_score} points).`,
+          description: `Increasing the budget from ₹${points[i - 1].budget.toLocaleString('en-IN')} to ₹${points[i].budget.toLocaleString('en-IN')} did not change the selected combination (score stayed ${points[i].optimal_score} points); the extra ₹${(points[i].budget - points[i - 1].budget).toLocaleString('en-IN')} stayed unallocated as remaining budget.`,
         });
         break;
+      }
+    }
+
+    const posItems = req.items.filter(it => Number(it.score) > 0);
+    if (posItems.length > 0) {
+      const highest = [...posItems].sort(
+        (a, b) => Number(b.score) - Number(a.score) || Number(a.cost) - Number(b.cost)
+      )[0];
+      const hCost = Number(highest.cost);
+      const hScore = Number(highest.score);
+      const unaffordable = points.filter(p => p.budget < hCost);
+      if (unaffordable.length > 0) {
+        const maxUnaff = unaffordable[unaffordable.length - 1].budget;
+        insights.push({
+          category: 'threshold',
+          title: `Budget threshold for high-value item "${highest.name}"`,
+          description: `Budgets up to ₹${maxUnaff.toLocaleString('en-IN')} are insufficient to include "${highest.name}" (cost ₹${hCost.toLocaleString('en-IN')}, score ${hScore}). A minimum budget of ₹${hCost.toLocaleString('en-IN')} is required before this item becomes individually feasible.`,
+        });
+      } else if (!last.selected_ids.includes(highest.id)) {
+        insights.push({
+          category: 'threshold',
+          title: `High-value item "${highest.name}" traded off for higher combined utility`,
+          description: `Even at ₹${last.budget.toLocaleString('en-IN')}, "${highest.name}" (cost ₹${hCost.toLocaleString('en-IN')}, score ${hScore}) is excluded because a combination of lower-cost items yields a higher total score (${last.optimal_score} points).`,
+        });
+      }
+    }
+
+    if (points.length >= 3 && span > 0 && gain > 0) {
+      const mid = points[Math.floor(points.length / 2)];
+      const firstSpan = mid.budget - first.budget;
+      const secondSpan = last.budget - mid.budget;
+      if (firstSpan > 0 && secondSpan > 0) {
+        const firstRate = ((mid.optimal_score - first.optimal_score) / firstSpan) * 1000;
+        const secondRate = ((last.optimal_score - mid.optimal_score) / secondSpan) * 1000;
+        if (secondRate < firstRate * 0.75) {
+          insights.push({
+            category: 'diminishing_returns',
+            title: 'Diminishing marginal score improvements at higher budgets',
+            description: `Early budget increases (₹${first.budget.toLocaleString('en-IN')} → ₹${mid.budget.toLocaleString('en-IN')}) yielded ${firstRate.toFixed(2)} score points per ₹1,000 added, whereas higher budget increases (₹${mid.budget.toLocaleString('en-IN')} → ₹${last.budget.toLocaleString('en-IN')}) yielded ${secondRate.toFixed(2)} points per ₹1,000 as high-density items were already saturated.`,
+          });
+        }
+      }
+    }
+
+    if (points.some(p => p.fifo_visited !== null)) {
+      const totalLc = points.reduce((acc, p) => acc + p.lc_visited, 0);
+      const totalFifo = points.reduce((acc, p) => acc + (p.fifo_visited || 0), 0);
+      if (totalFifo > 0) {
+        const red = Number(((1 - totalLc / totalFifo) * 100).toFixed(1));
+        insights.push({
+          category: 'efficiency',
+          title:
+            red > 0
+              ? 'LC Branch and Bound reduced node exploration across budget points'
+              : 'FIFO and LC Branch and Bound node exploration comparison',
+          description:
+            red > 0
+              ? `Across all ${points.length} budget points, LC Branch and Bound explored ${totalLc.toLocaleString('en-IN')} total nodes compared to ${totalFifo.toLocaleString('en-IN')} nodes for FIFO (${red}% fewer visited nodes).`
+              : `Across all ${points.length} budget points, LC explored ${totalLc.toLocaleString('en-IN')} total nodes and FIFO explored ${totalFifo.toLocaleString('en-IN')} total nodes while reaching identical verified optima.`,
+        });
       }
     }
   }

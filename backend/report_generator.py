@@ -1,4 +1,4 @@
-"""Downloadable PDF and CSV Optimization Report Generator for BudgetAdvisor.
+"""Downloadable PDF and CSV Optimization Report Generator for BudgetAdvisor (Group G12).
 
 Zero third-party PDF dependencies required: uses a deterministic, self-contained
 PDF 1.4 writer with native vector graphics, crisp tables, consistent typography,
@@ -25,10 +25,11 @@ from benchmark import run_benchmark_suite
 
 def _pdf_escape(text: str) -> str:
     """Sanitize and escape text for PDF WinAnsiEncoding / Type1 fonts."""
-    # Replace Rupee symbol with "Rs. " because standard PDF Type1 Helvetica uses WinAnsiEncoding
+    # Replace Rupee symbol and Unicode punctuation outside ISO-8859-1 with clean equivalents
     cleaned = (
         str(text)
         .replace('₹', 'Rs. ')
+        .replace('•', '-')
         .replace('—', '-')
         .replace('–', '-')
         .replace('·', '-')
@@ -124,10 +125,10 @@ class AcademicPDFBuilder:
         box_h = 54.0
         box_y = self.y - box_h
         self.draw_rect(self.MARGIN_X, box_y, self.content_w, box_h, fill_rgb=(0.18, 0.38, 0.34))
-        self.draw_text(self.MARGIN_X + 14, box_y + 32, title, font='F2', size=15, rgb=(1, 1, 1))
-        self.draw_text(self.MARGIN_X + 14, box_y + 14, subtitle, font='F1', size=9, rgb=(0.88, 0.94, 0.91))
+        self.draw_text(self.MARGIN_X + 14, box_y + 32, title, font='F2', size=14.0, rgb=(1, 1, 1))
+        self.draw_text(self.MARGIN_X + 14, box_y + 13, subtitle, font='F1', size=8.8, rgb=(0.88, 0.94, 0.91))
         if meta_right:
-            self.draw_text(self.PAGE_W - self.MARGIN_X - 165, box_y + 14, meta_right, font='F1', size=8.5, rgb=(0.9, 0.95, 0.92))
+            self.draw_text(self.PAGE_W - self.MARGIN_X - 118, box_y + 33, meta_right, font='F1', size=8.0, rgb=(0.9, 0.95, 0.92))
         self.y = box_y - 14
 
     def add_section_heading(self, number_str: str, title: str):
@@ -160,7 +161,11 @@ class AcademicPDFBuilder:
             y_top = self.y - r * row_h
             self.draw_rect(x + 2, y_top - row_h + 3, col_w - 4, row_h - 4, fill_rgb=(0.96, 0.98, 0.97), stroke_rgb=(0.86, 0.89, 0.88))
             self.draw_text(x + 8, y_top - 11, label.upper(), font='F1', size=7.0, rgb=(0.42, 0.47, 0.45))
-            self.draw_text(x + 8, y_top - 22, str(val)[:36], font='F2', size=9.5, rgb=(0.14, 0.18, 0.18))
+            val_str = str(val)
+            if len(val_str) > 28:
+                val_str = val_str[:27] + '.'
+            val_size = 8.6 if len(val_str) > 22 else 9.5
+            self.draw_text(x + 8, y_top - 22, val_str, font='F2', size=val_size, rgb=(0.14, 0.18, 0.18))
         self.y -= total_h + 4
 
     def add_table(self, headers: list[str], rows: list[list[str]], col_Editable_fractions: list[float]):
@@ -257,7 +262,7 @@ class AcademicPDFBuilder:
             footer_y = 24.0
             r, g, b = (0.48, 0.53, 0.51)
             line_cmd = f'q 0.5 w 0.85 0.88 0.86 RG {self.MARGIN_X:.2f} {footer_y + 11:.2f} m {self.PAGE_W - self.MARGIN_X:.2f} {footer_y + 11:.2f} l S Q'
-            left_txt = _pdf_escape('BudgetAdvisor · 0/1 Knapsack Optimization & Algorithm Analysis Report')
+            left_txt = _pdf_escape('BudgetAdvisor (Group G12) · 0/1 Knapsack Optimization & Algorithm Analysis Report')
             right_txt = _pdf_escape(f'Page {idx + 1} of {total_pages}')
             left_cmd = f'q BT /F1 7.5 Tf {r:.3f} {g:.3f} {b:.3f} rg {self.MARGIN_X:.2f} {footer_y:.2f} Td ({left_txt}) Tj ET Q'
             right_cmd = f'q BT /F2 7.5 Tf {r:.3f} {g:.3f} {b:.3f} rg {self.PAGE_W - self.MARGIN_X - 52:.2f} {footer_y:.2f} Td ({right_txt}) Tj ET Q'
@@ -328,7 +333,7 @@ def generate_optimization_pdf_report(req: ReportExportRequest) -> bytes:
 
     # Banner
     pdf.add_banner(
-        title='BudgetAdvisor — Optimization & DAA Report',
+        title='BudgetAdvisor (Group G12) — Optimization & DAA Report',
         subtitle='0/1 Knapsack Problem: FIFO Branch & Bound, LC Branch & Bound, and DP Verification',
         meta_right=now_str,
     )
@@ -336,7 +341,7 @@ def generate_optimization_pdf_report(req: ReportExportRequest) -> bytes:
     # Section 1: Project and Optimization Details
     pdf.add_section_heading('1', 'Project and Optimization Details')
     pdf.add_kv_grid([
-        ('Application', 'BudgetAdvisor (0/1 Knapsack)'),
+        ('Application & Group', 'BudgetAdvisor (Group G12)'),
         ('Selected Mode', f'{req.mode.title()} Advisor'),
         ('Dataset Name', req.dataset_name),
         ('Available Budget', f'Rs. {float(req.budget):,.2f}'),
@@ -429,6 +434,38 @@ def generate_optimization_pdf_report(req: ReportExportRequest) -> bytes:
         col_Editable_fractions=[0.20, 0.11, 0.11, 0.11, 0.10, 0.11, 0.11, 0.15],
     )
 
+    if req.include_benchmark and req.benchmark_sizes:
+        bench_req = BenchmarkRequest(
+            mode=req.mode,
+            dataset_source='custom' if len(req.items) > 0 else 'generated',
+            sizes=req.benchmark_sizes,
+            repetitions=2,
+            budget=req.budget if len(req.items) > 0 else None,
+            custom_items=req.items if len(req.items) > 0 else None,
+            max_nodes=req.max_nodes,
+            time_limit_ms=req.time_limit_ms,
+        )
+        bench_res = run_benchmark_suite(bench_req)
+        pdf.add_paragraph('Multi-Size Scaling Benchmark Summary (Median Execution Time & Node Counts):', font='F2', size=9.0)
+        bench_rows = []
+        for brow in bench_res.rows:
+            for m in (brow.fifo, brow.lc):
+                bench_rows.append([
+                    f'{brow.dataset_size} items',
+                    m.strategy.upper(),
+                    f'{m.execution_time_ms:.3f} ms',
+                    f'{m.nodes_generated:,}',
+                    f'{m.nodes_explored:,}',
+                    f'{m.nodes_pruned:,}',
+                    f'{m.max_queue_size:,}',
+                    f'{m.optimal_value:,.2f}',
+                ])
+        pdf.add_table(
+            headers=['Size', 'Algo', 'Median Time', 'Generated', 'Explored', 'Pruned', 'Max Queue', 'Opt Val'],
+            rows=bench_rows,
+            col_Editable_fractions=[0.11, 0.10, 0.14, 0.13, 0.13, 0.13, 0.13, 0.13],
+        )
+
     # Section 5: Verification
     pdf.add_section_heading('5', 'Independent Dynamic Programming Verification')
     if dp is not None:
@@ -494,7 +531,7 @@ def generate_optimization_pdf_report(req: ReportExportRequest) -> bytes:
             col_Editable_fractions=[0.17, 0.15, 0.17, 0.16, 0.11, 0.12, 0.12],
         )
         for ins in sens_res.insights[:3]:
-            pdf.add_paragraph(f'• {ins.title}: {ins.description}')
+            pdf.add_paragraph(f'- {ins.title}: {ins.description}')
     else:
         pdf.add_paragraph('Budget sensitivity analysis was not requested or the input dataset is empty.')
 

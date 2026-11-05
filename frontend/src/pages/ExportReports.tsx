@@ -26,6 +26,7 @@ export default function ExportReports({ workspace: w }: { workspace: Workspace }
   );
   const [includeSensitivity, setIncludeSensitivity] = useState<boolean>(true);
   const [sensitivityIntervals, setSensitivityIntervals] = useState<number>(6);
+  const [includeBenchmark, setIncludeBenchmark] = useState<boolean>(false);
   const [downloadingPdf, setDownloadingPdf] = useState<boolean>(false);
   const [downloadingCsv, setDownloadingCsv] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,6 +47,8 @@ export default function ExportReports({ workspace: w }: { workspace: Workspace }
         time_limit_ms: 1500,
         include_sensitivity: includeSensitivity,
         sensitivity_intervals: sensitivityIntervals,
+        include_benchmark: includeBenchmark,
+        benchmark_sizes: [5, 10, 15, 20],
       });
       triggerBrowserDownload(blob, `budgetadvisor_${w.mode}_report.pdf`);
       toast.success('Optimization PDF report downloaded');
@@ -195,12 +198,24 @@ export default function ExportReports({ workspace: w }: { workspace: Workspace }
                 </select>
               )}
             </div>
+
+            <div className="report-options-row">
+              <label className="checkbox-inline">
+                <input
+                  type="checkbox"
+                  data-testid="report-include-benchmark"
+                  checked={includeBenchmark}
+                  onChange={e => setIncludeBenchmark(e.target.checked)}
+                />
+                <span>Include Multi-Size Scaling Benchmark Table (5–20 items) in Section 4</span>
+              </label>
+            </div>
           </div>
 
           <div className="report-sections-preview" data-testid="report-sections-list">
             <span>Included Report Sections:</span>
             <ul>
-              <li><Check size={13} /> Section 1: Project & Optimization Details ({w.mode.toUpperCase()}, Budget {money(Number(w.data?.budget || 0))})</li>
+              <li><Check size={13} /> Section 1: Project & Optimization Details (Group G12, {w.mode.toUpperCase()}, Budget {money(Number(w.data?.budget || 0))})</li>
               <li><Check size={13} /> Section 2: Input Dataset ({w.data?.items.length || 0} items with costs & scores)</li>
               <li><Check size={13} /> Section 3: Optimal Recommendation ({rec ? `${number(rec.total_score)} pts, ${rec.selected_ids.length} items` : 'Computed on export'})</li>
               <li><Check size={13} /> Section 4: Algorithm Performance (FIFO vs. LC execution time, nodes, queue size)</li>
