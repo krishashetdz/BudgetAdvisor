@@ -6,18 +6,31 @@ Assigned Topic: 0/1 Knapsack using FIFO Branch and Bound and Least Cost (LC) Bra
 All monetary costs, budgets, and utility/return scores use exact integer hundredths
 to eliminate IEEE-754 binary floating-point rounding drift.
 
-Algorithmic & Theoretical Complexity Summary
---------------------------------------------
+Node-Counting & Search-Limit Terminology
+----------------------------------------
 Let:
   - n = number of available input items (0 <= n <= 24).
-  - k = number of search tree nodes generated / explored (1 <= k <= 2^(n+1) - 1,
-        capped at request.max_nodes <= 50,000).
-  - m = instantaneous size of the live search frontier (queue or min-heap), m <= k.
+  - k_gen (`generated`) = total search-tree nodes created and pushed into the frontier
+        (root + 2 children per expanded node, so k_gen = 1 + 2 * expanded).
+  - k_exp (`visited`) = total search-tree nodes popped (explored) from the frontier.
+  - `pruned` = total explored nodes discarded without expansion
+        (`infeasible_pruned + bound_pruned`).
+  - m (`frontier_remaining` at termination, peak `max_queue_size` during search) =
+        number of live nodes currently held in the search frontier (FIFO deque or LC heap),
+        satisfying `generated = visited + frontier_remaining` at all times.
+  - `request.max_nodes` (default 50,000) = configured search node limit applied strictly to
+        explored (`visited`) nodes (`visited <= request.max_nodes`). Because each expanded
+        node generates two children (`include` and `exclude`), `generated` can exceed
+        `request.max_nodes` (up to `2 * visited + 1 <= 100,001` nodes).
+  - k = asymptotic search-tree node count (since k_exp <= k_gen <= 2 * k_exp + 1,
+        k_gen = Theta(k_exp) = Theta(k), with 1 <= k <= 2^(n+1) - 1 in an uncapped tree).
 
-1. Preprocessing & Sorting:
-   Items are sorted once in descending order of exact rational value-to-cost density
-   (v_i / c_i) via `Fraction(score_hundredths, cost_hundredths)`, breaking ties by
-   original item index:
+Algorithmic & Implementation-Accurate Complexity Summary
+--------------------------------------------------------
+1. Preprocessing & Rational Density Sorting:
+   Items are converted to integer hundredths in O(n) and sorted once in descending order of
+   exact rational value-to-cost density (v_i / c_i) via `Fraction(score_hundredths, cost_hundredths)`,
+   breaking ties by original item index:
      - Time Complexity: O(n log n)
      - Auxiliary Space: O(n)
 
@@ -27,43 +40,70 @@ Let:
    slice UP to the nearest integer hundredth:
      `bound += (value * room + price - 1) // price`
    Stops immediately if `value <= 0` because remaining items have non-positive density.
-     - Time Complexity per Node: O(n - depth) = O(n) worst case
-     - Space Complexity: O(1)
+     - Time Complexity per Call: O(n - depth) = O(n) worst case
+     - Auxiliary Space: O(1)
 
 3. Child-Node Generation (`include` then `exclude`):
-   Each expanded internal node generates two children (`take=True`, `take=False`),
-   extending `node.chosen` (up to length n) and invoking `upper(depth + 1, ...)`:
-     - Time Complexity per Expansion: O(n)
+   Each expanded internal node at `depth < n` generates two children (`take=True`, `take=False`).
+   The `include` child copies and extends the immutable tuple `node.chosen + (original,)` of
+   length <= depth <= n in O(n) time, while `exclude` reuses `node.chosen` in O(1) time;
+   both invoke `upper(depth + 1, ...)` in O(n) time:
+     - Time Complexity per Expanded Node: O(n)
 
-4. Feasibility Checking & Branch Pruning:
-   - Budget feasibility check (`node.cost > budget`): O(1) per visited node.
-     Immediately pruned as `pruned_budget` (`infeasible_pruned`).
-   - Upper-bound pruning check (`node.bound < best_score`): O(1) per visited node.
-     Uses strict inequality (`<`) so equal-bound nodes are NOT pruned; score ties are
-     resolved deterministically by lower total cost, then lexicographically smallest
-     original item index tuple `(-score, cost, sorted_indices)`.
+4. Feasibility Checking, Selected-Index Sorting & Pruning per Explored Node:
+   - Budget feasibility check (`node.cost > budget`): O(1) integer comparison per explored node.
+     Infeasible nodes are immediately pruned (`infeasible_pruned += 1`, `status = 'pruned_budget'`).
+   - Selected-index sorting (`indices = tuple(sorted(node.chosen))`): Executed for every
+     budget-feasible explored node (`node.cost <= budget`) because `node.chosen` accumulates
+     original item indices in profit-density order rather than ascending index order. Sorting
+     up to `depth <= n` indices takes O(n log n) time in the worst case, followed by O(n)
+     tuple comparison for canonical tie-breaking `(-score, cost, indices)`.
+   - Upper-bound pruning check (`node.bound < best_score`): O(1) integer comparison.
+     Uses strict inequality (`<`) so equal-bound nodes (`node.bound == best_score`) remain
+     searchable to guarantee canonical tie-breaking (lowest cost, then lexicographically
+     first original indices).
 
-5. Frontier Operations & Overall Search Complexity:
+5. Frontier Operations & Overall Time Complexity (FIFO vs. LC):
    - FIFO Branch and Bound (`collections.deque`):
-       * Enqueue (`append`) and Dequeue (`popleft`): O(1) amortized per node.
-       * Search Time (for k explored/generated nodes): O(n log n + n*k) = O(nk).
-       * Best-Case Time (strong pruning, k = Theta(n)): O(n^2).
-       * Average-Case Time (input-dependent expected nodes E[k]): O(n log n + n * E[k]).
-       * Worst-Case Time (ineffective pruning, k = Theta(2^n)): O(n * 2^n).
-       * Worst-Case Search Space / Frontier Space: O(2^n) nodes.
+       * Queue Enqueue (`append`) and Dequeue (`popleft`): O(1) amortized per node.
+       * Per-Node Processing Cost: O(n log n) worst case (dominated by `tuple(sorted(node.chosen))`
+         plus O(n) upper-bound calculation and tuple copying).
+       * Parameterized Search Time (for k nodes): O(k n log n).
+       * Combined Time Complexity: O(n log n + k n log n) = O(k n log n).
+       * Best-Case Time: O(n log n) when search prunes immediately at the root (k = Theta(1)),
+         or O(n^2 log n) when strong pruning explores only a single principal root-to-leaf path
+         of k = Theta(n) nodes.
+       * Average-Case Time (input-dependent expected nodes E[k_FIFO]):
+         O(n log n + E[k_FIFO] * n log n).
+       * Worst-Case Time (ineffective pruning, k = Theta(2^n)):
+         O(2^n * n log n).
    - Least Cost (LC) Branch and Bound (`heapq` binary min-heap on `(-node.bound, node.id, node)`):
-       * Insert (`heappush`) and Extract-Min (`heappop`): O(log m) <= O(log k) per node.
-       * Search Time (for k explored/generated nodes): O(n log n + n*k + k log k) = O(nk + k log k).
-       * Best-Case Time (strong pruning, k = Theta(n)): O(n^2).
-       * Average-Case Time (input-dependent expected nodes E[k]): O(n log n + E[k]*(n + log E[k])).
-       * Worst-Case Time (k = Theta(2^n), where log(2^n) = n): O(n * 2^n).
-       * Worst-Case Search Space / Frontier Space: O(2^n) nodes.
+       * Priority Queue Insert (`heappush`) and Extract-Min (`heappop`): O(log m) <= O(log k)
+         per node, where m <= k is the live heap size. Priority ties on `-node.bound` are broken
+         in O(1) by monotonic creation order `node.id`.
+       * Per-Node Processing Cost: O(n log n + log m) <= O(n log n + log k).
+       * Combined Parameterized Time Complexity:
+         O(n log n + k(n log n + log k))  [or O(n log n + k(n log n + log m))].
+       * Best-Case Time: O(n log n) for immediate root resolution (k = Theta(1)), or
+         O(n log n + n(n log n + log n)) = O(n^2 log n) when strong pruning dives directly
+         along k = Theta(n) nodes.
+       * Average-Case Time (input-dependent expected nodes E[k_LC]):
+         O(n log n + E[k_LC] * (n log n + log E[k_LC])).
+       * Worst-Case Time (k = Theta(2^n), where log_2(k) = Theta(n) <= n log n):
+         O(2^n * (n log n + n)) = O(2^n * n log n).
 
-6. Space Distinction:
-   - Search Frontier Space: Live nodes currently in `queue` or `heap`, bounded by
-     `max_queue_size` (worst-case O(2^n) nodes, or O(n * 2^n) including `chosen` tuples).
-   - Additional Data Structures: Sorted item array O(n), visualization `trace` dictionary
-     capped at 30 nodes O(1), and sampled `progress` frames.
+6. Space Complexity Analysis:
+   - 1. Number of Stored Search Nodes: At most m_max (`max_queue_size`) live nodes in the
+        frontier (O(m_max) <= O(k), worst-case O(2^n) nodes in an uncapped tree).
+   - 2. Memory per Search Node: Each `Node` instance stores scalar attributes in O(1) plus
+        `chosen: tuple[int, ...]` of length <= depth <= n, requiring O(n) space per node
+        in the worst case.
+   - 3. Maximum Search-Frontier Space: O(n * m_max) <= O(n * k) memory (worst-case O(n * 2^n)
+        for O(2^n) frontier nodes each holding up to O(n) chosen indices).
+   - 4. Total Algorithm Space: O(n + n * m_max + k_exp) <= O(n * k) (worst-case O(n * 2^n)),
+        comprising the O(n) sorted item array, O(n) incumbent index tuple, O(n * m_max) live
+        frontier, O(min(k_gen, 30)) = O(1) visualization `trace` dictionary, and O(k_exp)
+        sampled `SearchFrame` progress snapshots.
 """
 from collections import deque
 from dataclasses import dataclass
@@ -174,6 +214,7 @@ def solve(request: SolveRequest, strategy: str, on_progress=None) -> SolverResul
             infeasible_pruned += 1
             status = 'pruned_budget'
         else:
+            # O(n log n) worst-case sort of chosen original indices for canonical tie-breaking
             indices = tuple(sorted(node.chosen))
             # Canonical tie-breaking: max score -> min cost -> lexicographically first original indices
             if (-node.score, node.cost, indices) < (-best_score, best_cost, best_indices):

@@ -1,16 +1,17 @@
-"""Comprehensive Rubric Audit Tests for BudgetAdvisor (Group G12).
+"""Comprehensive Rubric Audit & Full Regression Tests for BudgetAdvisor (Group G12).
 
-Covers all Professor Mini-Project Guideline requirements across:
+Covers all Professor Mini-Project Guideline and Final Technical Audit requirements across:
 - Category 1 (Correctness): FIFO queue level-order traversal, LC priority-queue bound ordering,
-  fractional-knapsack upper-bound conservatives, feasibility checking, branch pruning,
+  fractional-knapsack upper-bound conservativeness, feasibility checking, branch pruning,
   DP independent verification, and multi-optimal canonical tie-breaking.
 - Category 2 (Robustness): All 18 required edge cases including empty dataset, single item,
   zero budget, budget < min item, budget == item cost, budget > total cost, item > budget,
   duplicate item costs, duplicate item values, multiple optimal combinations, negative/invalid costs,
-  invalid budgets, missing item attributes, 24-item max datasets, search node limits,
+  invalid budgets, missing item attributes, 24-item max datasets, search node limits (visited vs generated),
   execution time limits, invalid API requests, and database unavailability / in-memory fallback.
-- Category 4 & 5 (Practical Application & Theoretical/Empirical Features): Shopping & Investment modes,
-  Performance Benchmarking, What-If Budget Sensitivity Analysis, and PDF/CSV Report Generation.
+- Category 3 & 4 (Regression across UI & Application Logic): Shopping & Investment modes,
+  manual selection hundredths & over-budget calculation, search tree & step-by-step replay frames,
+  saved runs lifecycle, Undo/Redo draft history state machine, and PDF/CSV report consistency.
 """
 from __future__ import annotations
 
@@ -41,6 +42,7 @@ from models import (  # noqa: E402
     SolveRequest,
 )
 from report_generator import generate_benchmark_csv, generate_optimization_pdf_report  # noqa: E402
+from samples import SAMPLES  # noqa: E402
 from sensitivity import run_sensitivity_analysis  # noqa: E402
 from server import _InMemoryClient, _InMemoryCollection, _InMemoryDB  # noqa: E402
 from solver import solve, solve_pair  # noqa: E402
@@ -233,7 +235,6 @@ def test_duplicate_item_costs_and_duplicate_item_values(strategy: str):
     )
     res_v = solve(req_dup_val, strategy)
     dp_v = solve_dp(req_dup_val)
-    # Only one can fit since 4500 + 3200 = 7700 > 5000; both give score 80, so lower cost ("cheap", 3200) must win
     assert res_v.selected_ids == ["cheap"]
     assert res_v.total_cost == 3200.0
     assert res_v.remaining_budget == 1800.0
@@ -374,3 +375,59 @@ def test_pdf_report_with_benchmark_table_and_empty_dataset(api_client):
     empty_text = "\n".join(p.extract_text() or "" for p in empty_reader.pages)
     assert "No input items were provided" in empty_text
     assert "No items were selected" in empty_text
+
+
+# ============================================================================
+# CATEGORY 3: SEARCH TREE, REPLAY TIMELINE, AND NODE-ACCOUNTING REGRESSION
+# ============================================================================
+
+def test_search_tree_solution_path_and_replay_timeline_invariants():
+    """Verify search tree trace nodes, on_solution path marking, and step-by-step replay SearchFrame invariants."""
+    shopping = next(s for s in SAMPLES if s["mode"] == "shopping")
+    req = SolveRequest(mode="shopping", items=shopping["items"], budget=Decimal(shopping["budget"]))
+    run = compute_run(req)
+
+    for res in (run.fifo, run.lc):
+        # Verify node-accounting equations
+        assert res.generated == 1 + 2 * res.expanded
+        assert res.generated == res.visited + res.frontier_remaining
+        assert res.pruned == res.bound_pruned + res.infeasible_pruned
+        assert res.frontier_remaining == 0
+        assert res.proven_optimal is True
+
+        # Verify trace tree structure and on_solution root marking
+        assert 1 <= len(res.trace) <= 30
+        trace_by_id = {t.id: t for t in res.trace}
+        assert 0 in trace_by_id
+        assert trace_by_id[0].on_solution is True
+        for t in res.trace:
+            if t.parent is not None:
+                assert t.parent in trace_by_id
+                if t.on_solution:
+                    assert trace_by_id[t.parent].on_solution is True
+
+        # Verify progress frames for step-by-step replay
+        assert len(res.progress) >= 2
+        visited_seq = [f.visited for f in res.progress]
+        assert visited_seq == sorted(visited_seq)
+        assert res.progress[-1].visited == res.visited
+        assert res.progress[-1].generated == res.generated
+        assert res.progress[-1].pruned == res.pruned
+        assert res.progress[-1].frontier == res.frontier_remaining
+        assert res.progress[-1].best_score == res.total_score
+
+
+def test_frontend_manual_selection_undo_redo_and_local_solver_suite():
+    """Execute the frontend logic test suite (manualSelection.ts, useDraftHistory.ts Undo/Redo, localSolver.ts) via Node.js."""
+    import subprocess
+    frontend_dir = Path(__file__).resolve().parents[2] / "frontend"
+    res = subprocess.run(
+        ["node", "--test", "src/frontend_logic.test.mjs"],
+        cwd=str(frontend_dir),
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert res.returncode == 0, f"Frontend test suite failed:\n{res.stdout}\n{res.stderr}"
+    assert "pass 4" in res.stdout
+    assert "fail 0" in res.stdout

@@ -286,7 +286,7 @@ export default function PerformanceAnalysis({ workspace: w }: { workspace: Works
                 </h2>
               </div>
               <span className="count-tag" data-testid="benchmark-meta-tag">
-                Warm-up + {benchmark.repetitions}× median · Limit {number(w.maxNodes)} nodes
+                Warm-up + {benchmark.repetitions}× median · Limit {number(w.maxNodes)} explored nodes
               </span>
             </div>
 

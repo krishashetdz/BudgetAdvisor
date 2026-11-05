@@ -115,7 +115,7 @@ backend:
     status_history:
       - working: true
         agent: "main"
-        comment: "FIFO queue-based level-by-level search implemented with fractional knapsack bounding function and deterministic tie-breaking. 100% verified against exhaustive and DP baselines across 37 algorithmic tests."
+        comment: "FIFO queue-based level-by-level search implemented with fractional knapsack bounding function and deterministic tie-breaking. Verified against exhaustive and DP baselines across 37 algorithmic tests plus rubric audit tests."
 
   - task: "0/1 Knapsack LC (Least Cost / Best-First) Branch and Bound Solver"
     implemented: true
@@ -127,34 +127,58 @@ backend:
     status_history:
       - working: true
         agent: "main"
-        comment: "LC priority-queue-based search with -bound key ordering. Explores highest promising bound first. Pruning and bounding verified."
+        comment: "LC priority-queue-based search with (-node.bound, node.id, node) ordering. Explores highest promising bound first. Pruning, bounding, and node-limit semantics (visited vs generated) verified."
 
   - task: "Independent Dynamic Programming (DP) Baseline Solver"
     implemented: true
     working: true
     file: "backend/dp_solver.py"
     stuck_count: 0
-    priority: "medium"
+    priority: "high"
     needs_retesting: false
     status_history:
       - working: true
         agent: "main"
-        comment: "Exact sparse-cost DP recurrence verifies optimality of Branch and Bound results."
+        comment: "Exact sparse-cost DP recurrence verifies optimality of Branch and Bound results. Documented O(n) immutable tuple copy per transition yielding O(sum (i+1) S_i) <= O(n^2 S) time and O(nS) space."
 
-  - task: "Shopping and Investment Dataset Management & API"
+  - task: "Performance Benchmarking Suite & API (/api/benchmark)"
     implemented: true
     working: true
-    file: "backend/server.py"
+    file: "backend/benchmark.py"
     stuck_count: 0
     priority: "high"
     needs_retesting: false
     status_history:
       - working: true
         agent: "main"
-        comment: "Endpoints /api/datasets, /api/solve, /api/solve/stream, /api/runs verified with seed shopping and investment stocks."
+        comment: "Verified identical datasets for FIFO & LC, size deduplication/sorting, warm-up execution, multi-repetition median calculation, generated/explored/pruned/max_queue_size counts, DP agreement, and node/time limit handling."
+
+  - task: "What-If Budget Sensitivity Analysis & API (/api/sensitivity)"
+    implemented: true
+    working: true
+    file: "backend/sensitivity.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Verified min/max budget bounds, multiple intervals, independent solver evaluation per step, expenditure <= budget, exact remaining budget, Shopping & Investment modes, and verification status labels."
+
+  - task: "PDF & CSV Optimization Report Generator (/api/report/pdf, /api/report/csv)"
+    implemented: true
+    working: true
+    file: "backend/report_generator.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Fixed first-page header spacing (separated Group G12 & UTC timestamp top bar from main title), improved pagination so 8-item reports with/without benchmark fit cleanly on 2 pages without sparse 3rd-page whitespace, and verified 21-column CSV export."
 
 frontend:
-  - task: "Shopping & Investment Mode Selection & Budget Controls"
+  - task: "Shopping & Investment Mode Selection, Manual Selection & Undo/Redo Controls"
     implemented: true
     working: true
     file: "frontend/src/pages/Dashboard.tsx"
@@ -164,9 +188,9 @@ frontend:
     status_history:
       - working: true
         agent: "main"
-        comment: "Mode switch for Shopping and Investment, budget slider and numeric input, customizable item table with validation."
+        comment: "Verified Shopping and Investment modes, manual selection hundredths & over-budget calculations (manualSelection.ts), and 100-step Undo/Redo draft history reducer with edit-group coalescing (useDraftHistory.ts)."
 
-  - task: "Side-by-Side Search Race & Visual Decision Tree"
+  - task: "Side-by-Side Search Race, Visual Decision Tree & Replay"
     implemented: true
     working: true
     file: "frontend/src/components/SearchTree.tsx"
@@ -176,142 +200,67 @@ frontend:
     status_history:
       - working: true
         agent: "main"
-        comment: "Live step-by-step tree visualization for FIFO vs LC with node counts, pruning stats, and replay controls."
+        comment: "Verified ancestor-closed 30-node trace, on_solution path highlighting, and monotonic SearchFrame progress snapshots for step-by-step replay."
 
-  - task: "Tri-Method Verification Strip (FIFO vs LC vs DP)"
+  - task: "Behind the Algorithm Theoretical Complexity & Node-Limit Reference"
     implemented: true
     working: true
-    file: "frontend/src/components/Results.tsx"
+    file: "frontend/src/pages/Method.tsx"
     stuck_count: 0
-    priority: "medium"
+    priority: "high"
     needs_retesting: false
     status_history:
       - working: true
         agent: "main"
-        comment: "Comparison strip reports optimal value, compute time, and work units (nodes visited / states evaluated) with agreement checkmark."
+        comment: "Updated Method.tsx with verified FIFO O(n log n + k n log n), LC O(n log n + k(n log n + log k)), and Sparse DP O(sum (i+1) S_i) <= O(n^2 S) complexities, 4-part space analysis, and generated vs explored node-limit distinctions."
 
 metadata:
   created_by: "main_agent"
-  version: "1.0"
-  test_sequence: 1
+  version: "2.0"
+  test_sequence: 2
   run_ui: true
 
 test_plan:
   current_focus:
     - "0/1 Knapsack FIFO Branch and Bound Solver"
     - "0/1 Knapsack LC (Least Cost / Best-First) Branch and Bound Solver"
-    - "Shopping and Investment Dataset Management & API"
+    - "Performance Benchmarking Suite & API (/api/benchmark)"
+    - "What-If Budget Sensitivity Analysis & API (/api/sensitivity)"
+    - "PDF & CSV Optimization Report Generator (/api/report/pdf, /api/report/csv)"
   stuck_tasks: []
   test_all: true
   test_priority: "high_first"
 
 agent_communication:
   - agent: "main"
-    message: "Verified all 70 unit and integration tests across backend solvers, stream endpoints, and API contracts. Validated both Shopping and Investment modes."
+    message: "Executed full backend pytest suite (102 passed, 0 failed, 0 skipped) and frontend Node.js logic test suite (4 passed, 0 failed, 0 skipped) on 2026-11-05."
 
-user_problem_statement: "0/1 Knapsack (LC & FIFO Branch and Bound) - Budget-Constrained Shopping/Investment Advisor: picks best combination of items/stocks within a fixed budget"
-
-backend:
-  - task: "0/1 Knapsack FIFO Branch and Bound Solver"
-    implemented: true
-    working: true
-    file: "backend/solver.py"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: false
-    status_history:
-      - working: true
-        agent: "main"
-        comment: "FIFO queue-based level-by-level search implemented with fractional knapsack bounding function and deterministic tie-breaking. 100% verified against exhaustive and DP baselines across 37 algorithmic tests."
-
-  - task: "0/1 Knapsack LC (Least Cost / Best-First) Branch and Bound Solver"
-    implemented: true
-    working: true
-    file: "backend/solver.py"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: false
-    status_history:
-      - working: true
-        agent: "main"
-        comment: "LC priority-queue-based search with -bound key ordering. Explores highest promising bound first. Pruning and bounding verified."
-
-  - task: "Independent Dynamic Programming (DP) Baseline Solver"
-    implemented: true
-    working: true
-    file: "backend/dp_solver.py"
-    stuck_count: 0
-    priority: "medium"
-    needs_retesting: false
-    status_history:
-      - working: true
-        agent: "main"
-        comment: "Exact sparse-cost DP recurrence verifies optimality of Branch and Bound results."
-
-  - task: "Shopping and Investment Dataset Management & API"
-    implemented: true
-    working: true
-    file: "backend/server.py"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: false
-    status_history:
-      - working: true
-        agent: "main"
-        comment: "Endpoints /api/datasets, /api/solve, /api/solve/stream, /api/runs verified with seed shopping and investment stocks."
-
-frontend:
-  - task: "Shopping & Investment Mode Selection & Budget Controls"
-    implemented: true
-    working: true
-    file: "frontend/src/pages/Dashboard.tsx"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: false
-    status_history:
-      - working: true
-        agent: "main"
-        comment: "Mode switch for Shopping and Investment, budget slider and numeric input, customizable item table with validation."
-
-  - task: "Side-by-Side Search Race & Visual Decision Tree"
-    implemented: true
-    working: true
-    file: "frontend/src/components/SearchTree.tsx"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: false
-    status_history:
-      - working: true
-        agent: "main"
-        comment: "Live step-by-step tree visualization for FIFO vs LC with node counts, pruning stats, and replay controls."
-
-  - task: "Tri-Method Verification Strip (FIFO vs LC vs DP)"
-    implemented: true
-    working: true
-    file: "frontend/src/components/Results.tsx"
-    stuck_count: 0
-    priority: "medium"
-    needs_retesting: false
-    status_history:
-      - working: true
-        agent: "main"
-        comment: "Comparison strip reports optimal value, compute time, and work units (nodes visited / states evaluated) with agreement checkmark."
-
-metadata:
-  created_by: "main_agent"
-  version: "1.0"
-  test_sequence: 1
-  run_ui: true
-
-test_plan:
-  current_focus:
-    - "0/1 Knapsack FIFO Branch and Bound Solver"
-    - "0/1 Knapsack LC (Least Cost / Best-First) Branch and Bound Solver"
-    - "Shopping and Investment Dataset Management & API"
-  stuck_tasks: []
-  test_all: true
-  test_priority: "high_first"
-
-agent_communication:
-  - agent: "main"
-    message: "Verified all 70 unit and integration tests across backend solvers, stream endpoints, and API contracts. Validated both Shopping and Investment modes."
+#====================================================================================================
+# Latest Automated Test Execution Summary (2026-11-05)
+#====================================================================================================
+# Date of Execution: 2026-11-05
+#
+# 1. Backend & End-to-End Pytest Suite:
+#    - Command: `cd backend && pytest -v`
+#    - Tests Executed: 102
+#    - Passed Tests: 102
+#    - Failed Tests: 0
+#    - Skipped Tests: 0
+#    - Breakdown by Module:
+#      * `tests/test_solver_algorithm_validation.py`: 37 passed
+#      * `tests/test_api_e2e_budget_advisor.py`: 17 passed
+#      * `tests/test_dp_stream_regression.py`: 16 passed
+#      * `tests/test_new_features_benchmark_sensitivity_reports.py`: 17 passed
+#      * `tests/test_comprehensive_rubric_audit.py`: 15 passed (includes subprocess execution of frontend logic suite)
+#
+# 2. Frontend Logic Test Suite (Node.js):
+#    - Command: `cd frontend && node --test src/frontend_logic.test.mjs`
+#    - Tests Executed: 4 subtest suites
+#    - Passed Tests: 4
+#    - Failed Tests: 0
+#    - Skipped Tests: 0
+#
+# 3. Remaining Limitations / Notes:
+#    - Dataset size is intentionally bounded at 24 items (`max_length=24`), explored node visits at 50,000 (`max_nodes <= 50,000`), DP retained states at 50,000 / evaluations at 200,000, and per-solver wall-clock timeout at 1,500 ms to ensure interactive responsiveness.
+#    - When MongoDB is not running on `localhost:27017`, the backend automatically uses its built-in in-memory database fallback (`_InMemoryClient`), which supports full runtime CRUD within the server process lifetime.
+#    - Team member names in `README.md` (`Member 1: [Full Name]` .. `Member 4: [Full Name]`) are editable placeholders awaiting the group's actual names prior to final submission.

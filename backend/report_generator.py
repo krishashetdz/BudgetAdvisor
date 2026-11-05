@@ -25,7 +25,6 @@ from benchmark import run_benchmark_suite
 
 def _pdf_escape(text: str) -> str:
     """Sanitize and escape text for PDF WinAnsiEncoding / Type1 fonts."""
-    # Replace Rupee symbol and Unicode punctuation outside ISO-8859-1 with clean equivalents
     cleaned = (
         str(text)
         .replace('₹', 'Rs. ')
@@ -37,7 +36,6 @@ def _pdf_escape(text: str) -> str:
         .replace('≥', '>=')
         .replace('≤', '<=')
     )
-    # Encode to latin-1 safely
     cleaned = cleaned.encode('latin-1', errors='replace').decode('latin-1')
     return cleaned.replace('\\', '\\\\').replace('(', '\\(').replace(')', '\\)')
 
@@ -63,9 +61,9 @@ class AcademicPDFBuilder:
 
     PAGE_W = 595.28  # A4 width in pt
     PAGE_H = 841.89  # A4 height in pt
-    MARGIN_X = 42.0
-    MARGIN_TOP = 48.0
-    MARGIN_BOTTOM = 48.0
+    MARGIN_X = 40.0
+    MARGIN_TOP = 38.0
+    MARGIN_BOTTOM = 40.0
 
     def __init__(self, title: str):
         self.title = title
@@ -88,7 +86,7 @@ class AcademicPDFBuilder:
         if self.y - height_needed < self.MARGIN_BOTTOM:
             self.new_page()
 
-    def add_spacing(self, pts: float = 10.0):
+    def add_spacing(self, pts: float = 8.0):
         self.y -= pts
         if self.y < self.MARGIN_BOTTOM:
             self.new_page()
@@ -121,37 +119,72 @@ class AcademicPDFBuilder:
         )
 
     def add_banner(self, title: str, subtitle: str, meta_right: str):
-        self.ensure_space(64)
-        box_h = 54.0
+        """Render a 3-row header banner with separated metadata/timestamp, main title, and subtitle."""
+        box_h = 60.0
+        self.ensure_space(box_h + 10.0)
         box_y = self.y - box_h
         self.draw_rect(self.MARGIN_X, box_y, self.content_w, box_h, fill_rgb=(0.18, 0.38, 0.34))
-        self.draw_text(self.MARGIN_X + 14, box_y + 32, title, font='F2', size=14.0, rgb=(1, 1, 1))
-        self.draw_text(self.MARGIN_X + 14, box_y + 13, subtitle, font='F1', size=8.8, rgb=(0.88, 0.94, 0.91))
+
+        # Top metadata row inside banner: Group ID on left, UTC timestamp separated on right
+        self.draw_text(
+            self.MARGIN_X + 14,
+            box_y + 46,
+            'GROUP ID: G12  |  DESIGN & ANALYSIS OF ALGORITHMS',
+            font='F2',
+            size=7.4,
+            rgb=(0.80, 0.91, 0.88),
+        )
         if meta_right:
-            self.draw_text(self.PAGE_W - self.MARGIN_X - 118, box_y + 33, meta_right, font='F1', size=8.0, rgb=(0.9, 0.95, 0.92))
-        self.y = box_y - 14
+            stamp_label = f'Generated: {meta_right}'
+            # Right-align timestamp cleanly in top metadata band (never on the same row as title)
+            stamp_x = self.PAGE_W - self.MARGIN_X - max(145.0, len(stamp_label) * 4.3 + 14.0)
+            self.draw_text(stamp_x, box_y + 46, stamp_label, font='F1', size=7.6, rgb=(0.90, 0.96, 0.93))
 
-    def add_section_heading(self, number_str: str, title: str):
-        self.ensure_space(34)
-        self.y -= 4
-        self.draw_text(self.MARGIN_X, self.y - 11, f'SECTION {number_str}', font='F2', size=7.5, rgb=(0.26, 0.48, 0.44))
-        self.draw_text(self.MARGIN_X, self.y - 24, title, font='F2', size=12, rgb=(0.14, 0.18, 0.18))
-        self.draw_line(self.MARGIN_X, self.y - 29, self.PAGE_W - self.MARGIN_X, self.y - 29, rgb=(0.26, 0.48, 0.44), line_w=1.0)
-        self.y -= 38
+        # Middle row: Full-width report title with generous vertical and horizontal clearance
+        self.draw_text(self.MARGIN_X + 14, box_y + 26, title, font='F2', size=13.2, rgb=(1, 1, 1))
 
-    def add_paragraph(self, text: str, font: str = 'F1', size: float = 9.2, rgb=(0.20, 0.24, 0.23), max_chars: int = 98):
+        # Bottom row: Algorithmic subtitle
+        self.draw_text(self.MARGIN_X + 14, box_y + 10, subtitle, font='F1', size=8.5, rgb=(0.88, 0.94, 0.91))
+        self.y = box_y - 10
+
+    def add_section_heading(self, number_str: str, title: str, min_following_space: float = 64.0):
+        """Render section heading while ensuring enough vertical room for the first following element."""
+        heading_h = 29.0
+        self.ensure_space(heading_h + min_following_space)
+        self.y -= 2
+        self.draw_text(self.MARGIN_X, self.y - 9, f'SECTION {number_str}', font='F2', size=7.2, rgb=(0.26, 0.48, 0.44))
+        self.draw_text(self.MARGIN_X, self.y - 21, title, font='F2', size=11.4, rgb=(0.14, 0.18, 0.18))
+        self.draw_line(
+            self.MARGIN_X,
+            self.y - 25.0,
+            self.PAGE_W - self.MARGIN_X,
+            self.y - 25.0,
+            rgb=(0.26, 0.48, 0.44),
+            line_w=0.9,
+        )
+        self.y -= heading_h
+
+    def add_paragraph(
+        self,
+        text: str,
+        font: str = 'F1',
+        size: float = 8.9,
+        rgb=(0.20, 0.24, 0.23),
+        max_chars: int = 102,
+        keep_with_next: float = 0.0,
+    ):
         lines = _wrap_text(text, max_chars)
-        line_h = size * 1.42
-        self.ensure_space(len(lines) * line_h + 4)
+        line_h = size * 1.36
+        self.ensure_space(len(lines) * line_h + 3 + keep_with_next)
         for line in lines:
             self.draw_text(self.MARGIN_X, self.y - size, line, font=font, size=size, rgb=rgb)
             self.y -= line_h
-        self.y -= 3
+        self.y -= 2.5
 
     def add_kv_grid(self, pairs: list[tuple[str, str]], cols: int = 3):
         rows = (len(pairs) + cols - 1) // cols
-        row_h = 30.0
-        total_h = rows * row_h + 6
+        row_h = 26.0
+        total_h = rows * row_h + 4
         self.ensure_space(total_h)
         col_w = self.content_w / cols
         for idx, (label, val) in enumerate(pairs):
@@ -159,28 +192,47 @@ class AcademicPDFBuilder:
             c = idx % cols
             x = self.MARGIN_X + c * col_w
             y_top = self.y - r * row_h
-            self.draw_rect(x + 2, y_top - row_h + 3, col_w - 4, row_h - 4, fill_rgb=(0.96, 0.98, 0.97), stroke_rgb=(0.86, 0.89, 0.88))
-            self.draw_text(x + 8, y_top - 11, label.upper(), font='F1', size=7.0, rgb=(0.42, 0.47, 0.45))
+            self.draw_rect(
+                x + 2,
+                y_top - row_h + 3,
+                col_w - 4,
+                row_h - 4,
+                fill_rgb=(0.96, 0.98, 0.97),
+                stroke_rgb=(0.86, 0.89, 0.88),
+            )
+            self.draw_text(x + 8, y_top - 10, label.upper(), font='F1', size=6.8, rgb=(0.42, 0.47, 0.45))
             val_str = str(val)
-            if len(val_str) > 28:
-                val_str = val_str[:27] + '.'
-            val_size = 8.6 if len(val_str) > 22 else 9.5
-            self.draw_text(x + 8, y_top - 22, val_str, font='F2', size=val_size, rgb=(0.14, 0.18, 0.18))
-        self.y -= total_h + 4
+            if len(val_str) > 30:
+                val_str = val_str[:29] + '.'
+            val_size = 8.3 if len(val_str) > 22 else 9.1
+            self.draw_text(x + 8, y_top - 20, val_str, font='F2', size=val_size, rgb=(0.14, 0.18, 0.18))
+        self.y -= total_h + 2
 
     def add_table(self, headers: list[str], rows: list[list[str]], col_Editable_fractions: list[float]):
-        row_h = 18.0
-        header_h = 20.0
-        self.ensure_space(header_h + row_h + 6)
+        row_h = 16.5
+        header_h = 18.5
+        total_table_h = header_h + len(rows) * row_h + 6.0
+        # Keep compact tables intact on a single page if they would split near a page boundary
+        if total_table_h <= 210.0 and (self.y - total_table_h < self.MARGIN_BOTTOM):
+            self.new_page()
+        else:
+            self.ensure_space(header_h + row_h * min(2, max(1, len(rows))) + 6.0)
 
         col_widths = [f * self.content_w for f in col_Editable_fractions]
 
         def draw_header():
             y_box = self.y - header_h
-            self.draw_rect(self.MARGIN_X, y_box, self.content_w, header_h, fill_rgb=(0.91, 0.94, 0.92), stroke_rgb=(0.78, 0.83, 0.80))
+            self.draw_rect(
+                self.MARGIN_X,
+                y_box,
+                self.content_w,
+                header_h,
+                fill_rgb=(0.91, 0.94, 0.92),
+                stroke_rgb=(0.78, 0.83, 0.80),
+            )
             cx = self.MARGIN_X
             for h_text, cw in zip(headers, col_widths):
-                self.draw_text(cx + 6, y_box + 6, h_text, font='F2', size=8.0, rgb=(0.20, 0.28, 0.25))
+                self.draw_text(cx + 5, y_box + 5.5, h_text, font='F2', size=7.8, rgb=(0.20, 0.28, 0.25))
                 cx += cw
             self.y = y_box
 
@@ -191,31 +243,52 @@ class AcademicPDFBuilder:
                 draw_header()
             y_box = self.y - row_h
             fill = (0.985, 0.992, 0.988) if r_idx % 2 == 1 else (1.0, 1.0, 1.0)
-            self.draw_rect(self.MARGIN_X, y_box, self.content_w, row_h, fill_rgb=fill, stroke_rgb=(0.88, 0.91, 0.89))
+            self.draw_rect(
+                self.MARGIN_X,
+                y_box,
+                self.content_w,
+                row_h,
+                fill_rgb=fill,
+                stroke_rgb=(0.88, 0.91, 0.89),
+            )
             cx = self.MARGIN_X
             for cell, cw in zip(row, col_widths):
-                max_c = max(6, int(cw / 4.7) - 2)
+                max_c = max(6, int(cw / 4.35) - 1)
                 cell_str = str(cell)
                 if len(cell_str) > max_c:
                     cell_str = cell_str[: max_c - 1] + '.'
-                self.draw_text(cx + 6, y_box + 5.5, cell_str, font='F1', size=8.2, rgb=(0.16, 0.20, 0.19))
+                self.draw_text(cx + 5, y_box + 5.0, cell_str, font='F1', size=8.0, rgb=(0.16, 0.20, 0.19))
                 cx += cw
             self.y = y_box
-        self.y -= 8
+        self.y -= 5
 
     def add_sensitivity_chart(self, points: list[SensitivityPoint]):
         if not points:
             return
-        chart_h = 145.0
-        self.ensure_space(chart_h + 24)
+        chart_h = 124.0
+        self.ensure_space(chart_h + 15.0)
         box_y = self.y - chart_h
-        self.draw_rect(self.MARGIN_X, box_y, self.content_w, chart_h, fill_rgb=(0.985, 0.992, 0.988), stroke_rgb=(0.82, 0.86, 0.84))
-        self.draw_text(self.MARGIN_X + 12, self.y - 15, 'Budget vs. Maximum Achievable Score (0/1 Knapsack Sensitivity Curve)', font='F2', size=8.5, rgb=(0.18, 0.36, 0.32))
+        self.draw_rect(
+            self.MARGIN_X,
+            box_y,
+            self.content_w,
+            chart_h,
+            fill_rgb=(0.985, 0.992, 0.988),
+            stroke_rgb=(0.82, 0.86, 0.84),
+        )
+        self.draw_text(
+            self.MARGIN_X + 12,
+            self.y - 14,
+            'Budget vs. Maximum Achievable Score (0/1 Knapsack Sensitivity Curve)',
+            font='F2',
+            size=8.3,
+            rgb=(0.18, 0.36, 0.32),
+        )
 
-        plot_x = self.MARGIN_X + 52
-        plot_y = box_y + 24
-        plot_w = self.content_w - 72
-        plot_h = chart_h - 48
+        plot_x = self.MARGIN_X + 50
+        plot_y = box_y + 22
+        plot_w = self.content_w - 70
+        plot_h = chart_h - 44
 
         # Draw axes
         self.draw_line(plot_x, plot_y, plot_x + plot_w, plot_y, rgb=(0.55, 0.60, 0.58), line_w=0.8)
@@ -234,11 +307,11 @@ class AcademicPDFBuilder:
             gy = plot_y + frac * plot_h
             val = min_s + frac * span_s
             self.draw_line(plot_x, gy, plot_x + plot_w, gy, rgb=(0.88, 0.91, 0.89), line_w=0.4)
-            self.draw_text(self.MARGIN_X + 8, gy - 3, f'{val:,.0f}', font='F1', size=7.0, rgb=(0.42, 0.48, 0.46))
+            self.draw_text(self.MARGIN_X + 8, gy - 3, f'{val:,.0f}', font='F1', size=6.8, rgb=(0.42, 0.48, 0.46))
 
         # Plot polyline and markers
         coords: list[tuple[float, float, SensitivityPoint]] = []
-        for idx, p in enumerate(points):
+        for p in points:
             bx = plot_x + ((p.budget - min_b) / span_b) * plot_w if len(points) > 1 else plot_x + plot_w / 2
             sy = plot_y + ((p.optimal_score - min_s) / span_s) * plot_h
             coords.append((bx, sy, p))
@@ -246,31 +319,40 @@ class AcademicPDFBuilder:
         for i in range(1, len(coords)):
             x1, y1, _ = coords[i - 1]
             x2, y2, _ = coords[i]
-            self.draw_line(x1, y1, x2, y2, rgb=(0.26, 0.48, 0.44), line_w=1.6)
+            self.draw_line(x1, y1, x2, y2, rgb=(0.26, 0.48, 0.44), line_w=1.5)
 
-        for x, y, p in coords:
-            self.draw_rect(x - 2.5, y - 2.5, 5.0, 5.0, fill_rgb=(0.18, 0.38, 0.34))
-            self.draw_text(x - 14, plot_y - 12, f'Rs.{p.budget:,.0f}', font='F1', size=6.5, rgb=(0.40, 0.46, 0.44))
-            self.draw_text(x - 8, y + 5, f'{p.optimal_score:,.0f}', font='F2', size=6.8, rgb=(0.18, 0.38, 0.34))
+        label_stride = 2 if len(coords) > 8 else 1
+        for idx, (x, y, p) in enumerate(coords):
+            self.draw_rect(x - 2.3, y - 2.3, 4.6, 4.6, fill_rgb=(0.18, 0.38, 0.34))
+            if idx % label_stride == 0 or idx == len(coords) - 1:
+                self.draw_text(x - 14, plot_y - 11, f'Rs.{p.budget:,.0f}', font='F1', size=6.3, rgb=(0.40, 0.46, 0.44))
+            self.draw_text(x - 8, y + 4.5, f'{p.optimal_score:,.0f}', font='F2', size=6.6, rgb=(0.18, 0.38, 0.34))
 
-        self.y = box_y - 10
+        self.y = box_y - 6
 
     def build_bytes(self) -> bytes:
+        # Remove trailing empty page if one was added without drawing commands
+        while len(self.pages) > 1 and not self.pages[-1]:
+            self.pages.pop()
+
         total_pages = len(self.pages)
         # Add footer with page numbers to every page
         for idx, page_cmds in enumerate(self.pages):
-            footer_y = 24.0
+            footer_y = 20.0
             r, g, b = (0.48, 0.53, 0.51)
-            line_cmd = f'q 0.5 w 0.85 0.88 0.86 RG {self.MARGIN_X:.2f} {footer_y + 11:.2f} m {self.PAGE_W - self.MARGIN_X:.2f} {footer_y + 11:.2f} l S Q'
+            line_cmd = (
+                f'q 0.5 w 0.85 0.88 0.86 RG {self.MARGIN_X:.2f} {footer_y + 10:.2f} m '
+                f'{self.PAGE_W - self.MARGIN_X:.2f} {footer_y + 10:.2f} l S Q'
+            )
             left_txt = _pdf_escape('BudgetAdvisor (Group G12) · 0/1 Knapsack Optimization & Algorithm Analysis Report')
             right_txt = _pdf_escape(f'Page {idx + 1} of {total_pages}')
-            left_cmd = f'q BT /F1 7.5 Tf {r:.3f} {g:.3f} {b:.3f} rg {self.MARGIN_X:.2f} {footer_y:.2f} Td ({left_txt}) Tj ET Q'
-            right_cmd = f'q BT /F2 7.5 Tf {r:.3f} {g:.3f} {b:.3f} rg {self.PAGE_W - self.MARGIN_X - 52:.2f} {footer_y:.2f} Td ({right_txt}) Tj ET Q'
+            left_cmd = f'q BT /F1 7.4 Tf {r:.3f} {g:.3f} {b:.3f} rg {self.MARGIN_X:.2f} {footer_y:.2f} Td ({left_txt}) Tj ET Q'
+            right_cmd = (
+                f'q BT /F2 7.4 Tf {r:.3f} {g:.3f} {b:.3f} rg '
+                f'{self.PAGE_W - self.MARGIN_X - 50:.2f} {footer_y:.2f} Td ({right_txt}) Tj ET Q'
+            )
             page_cmds.extend([line_cmd, left_cmd, right_cmd])
 
-        # Assemble PDF objects
-        # 1: Catalog, 2: Pages, 3: Font F1 (Helvetica), 4: Font F2 (Helvetica-Bold)
-        # For each page i (0..N-1): Page object = 5 + 2*i, Content stream = 6 + 2*i
         objects: dict[int, bytes] = {}
         objects[3] = b'<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>'
         objects[4] = b'<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>'
@@ -331,7 +413,7 @@ def generate_optimization_pdf_report(req: ReportExportRequest) -> bytes:
     now_str = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
     pdf = AcademicPDFBuilder(title=f'BudgetAdvisor Report - {req.dataset_name}')
 
-    # Banner
+    # Banner with separated metadata row, main title, and subtitle
     pdf.add_banner(
         title='BudgetAdvisor (Group G12) — Optimization & DAA Report',
         subtitle='0/1 Knapsack Problem: FIFO Branch & Bound, LC Branch & Bound, and DP Verification',
@@ -413,6 +495,7 @@ def generate_optimization_pdf_report(req: ReportExportRequest) -> bytes:
             f'{run.fifo.generated:,}',
             f'{run.fifo.visited:,}',
             f'{run.fifo.pruned:,}',
+            f'{run.fifo.frontier_remaining:,}',
             f'{run.fifo.max_queue_size:,}',
             f'{run.fifo.total_score:,.2f}',
             'Proven Optimal' if run.fifo.proven_optimal else f'Stopped ({run.fifo.stop_reason})',
@@ -423,15 +506,21 @@ def generate_optimization_pdf_report(req: ReportExportRequest) -> bytes:
             f'{run.lc.generated:,}',
             f'{run.lc.visited:,}',
             f'{run.lc.pruned:,}',
+            f'{run.lc.frontier_remaining:,}',
             f'{run.lc.max_queue_size:,}',
             f'{run.lc.total_score:,.2f}',
             'Proven Optimal' if run.lc.proven_optimal else f'Stopped ({run.lc.stop_reason})',
         ],
     ]
     pdf.add_table(
-        headers=['Algorithm', 'Exec Time', 'Generated', 'Explored', 'Pruned', 'Max Queue', 'Optimal Val', 'Status'],
+        headers=['Algorithm', 'Exec Time', 'Generated', 'Explored', 'Pruned', 'Frontier', 'Max Queue', 'Opt Val', 'Status'],
         rows=perf_rows,
-        col_Editable_fractions=[0.20, 0.11, 0.11, 0.11, 0.10, 0.11, 0.11, 0.15],
+        col_Editable_fractions=[0.21, 0.10, 0.09, 0.09, 0.08, 0.08, 0.10, 0.10, 0.15],
+    )
+    pdf.add_paragraph(
+        f'Node-Limit Note: Configured search limit caps explored (visited) nodes at {req.max_nodes:,} '
+        f'({req.time_limit_ms:,} ms timeout). Because each expanded node generates 2 children, '
+        'generated nodes (1 + 2*expanded = explored + frontier) can exceed explored nodes when a search is capped.'
     )
 
     if req.include_benchmark and req.benchmark_sizes:
@@ -446,7 +535,6 @@ def generate_optimization_pdf_report(req: ReportExportRequest) -> bytes:
             time_limit_ms=req.time_limit_ms,
         )
         bench_res = run_benchmark_suite(bench_req)
-        pdf.add_paragraph('Multi-Size Scaling Benchmark Summary (Median Execution Time & Node Counts):', font='F2', size=9.0)
         bench_rows = []
         for brow in bench_res.rows:
             for m in (brow.fifo, brow.lc):
@@ -460,6 +548,12 @@ def generate_optimization_pdf_report(req: ReportExportRequest) -> bytes:
                     f'{m.max_queue_size:,}',
                     f'{m.optimal_value:,.2f}',
                 ])
+        pdf.add_paragraph(
+            'Multi-Size Scaling Benchmark Summary (Median Execution Time & Node Counts):',
+            font='F2',
+            size=8.8,
+            keep_with_next=min(190.0, 24.0 + len(bench_rows) * 16.5),
+        )
         pdf.add_table(
             headers=['Size', 'Algo', 'Median Time', 'Generated', 'Explored', 'Pruned', 'Max Queue', 'Opt Val'],
             rows=bench_rows,
@@ -467,7 +561,7 @@ def generate_optimization_pdf_report(req: ReportExportRequest) -> bytes:
         )
 
     # Section 5: Verification
-    pdf.add_section_heading('5', 'Independent Dynamic Programming Verification')
+    pdf.add_section_heading('5', 'Independent Dynamic Programming Verification', min_following_space=62.0)
     if dp is not None:
         fifo_ok = run.fifo.proven_optimal and dp.proven_optimal and run.fifo.total_score == dp.total_score
         lc_ok = run.lc.proven_optimal and dp.proven_optimal and run.lc.total_score == dp.total_score
@@ -494,7 +588,7 @@ def generate_optimization_pdf_report(req: ReportExportRequest) -> bytes:
             )
 
     # Section 6: Budget Sensitivity Analysis
-    pdf.add_section_heading('6', 'Budget Sensitivity / What-If Analysis')
+    pdf.add_section_heading('6', 'Budget Sensitivity / What-If Analysis', min_following_space=145.0)
     if req.include_sensitivity and len(req.items) > 0:
         base_b = float(req.budget)
         min_b = req.sensitivity_min_budget if req.sensitivity_min_budget is not None else Decimal(str(round(max(0.0, base_b * 0.25), 2)))
@@ -536,7 +630,7 @@ def generate_optimization_pdf_report(req: ReportExportRequest) -> bytes:
         pdf.add_paragraph('Budget sensitivity analysis was not requested or the input dataset is empty.')
 
     # Section 7: Conclusion
-    pdf.add_section_heading('7', 'Conclusion')
+    pdf.add_section_heading('7', 'Conclusion', min_following_space=48.0)
     node_diff = run.fifo.visited - run.lc.visited
     if node_diff > 0:
         eff_sentence = (
