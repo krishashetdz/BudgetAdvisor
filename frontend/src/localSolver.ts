@@ -1,4 +1,22 @@
-import { Dataset, Item, Mode, Run, Snapshot, SolverResult, TraceNode, SearchFrame, DPResult } from './types';
+import {
+  BenchmarkAlgorithmMetrics,
+  BenchmarkRequestPayload,
+  BenchmarkResponse,
+  BenchmarkRow,
+  Dataset,
+  DPResult,
+  Item,
+  Mode,
+  Run,
+  SearchFrame,
+  SensitivityInsight,
+  SensitivityPoint,
+  SensitivityRequestPayload,
+  SensitivityResponse,
+  Snapshot,
+  SolverResult,
+  TraceNode,
+} from './types';
 import { hundredths } from './manualSelection';
 
 export const SHOPPING_ROWS: [string, number, number][] = [
@@ -21,6 +39,46 @@ export const INVESTMENT_ROWS: [string, number, number][] = [
   ['Maple consumer fund', 1500, 9],
   ['Summit infrastructure', 4500, 17],
   ['Willow small-cap fund', 2200, 15.5],
+];
+
+const SHOPPING_BENCHMARK_POOL: [string, number, number][] = [
+  ...SHOPPING_ROWS,
+  ['Noise-cancelling earbuds', 2400, 80],
+  ['Ergonomic mouse', 1800, 74],
+  ['Portable SSD 1TB', 5200, 92],
+  ['USB-C docking station', 3100, 81],
+  ['Smart desk mat', 950, 58],
+  ['Webcam 1080p', 2600, 76],
+  ['Monitor light bar', 1900, 71],
+  ['Laptop stand aluminum', 1350, 69],
+  ['Blue-light glasses', 1100, 60],
+  ['Travel power bank', 2100, 79],
+  ['Acoustic foam pack', 1600, 62],
+  ['Mechanical numpad', 1450, 64],
+  ['Cable organizer kit', 650, 52],
+  ['Smart plug duo', 1250, 63],
+  ['Document scanner', 4600, 87],
+  ['Microfiber desk pad', 750, 54],
+];
+
+const INVESTMENT_BENCHMARK_POOL: [string, number, number][] = [
+  ...INVESTMENT_ROWS,
+  ['Quantum semiconductor ETF', 3800, 19.5],
+  ['Sovereign gilt trust', 1800, 6.8],
+  ['Renewable grid REIT', 3200, 15.2],
+  ['Global logistics fund', 2900, 13.4],
+  ['Biotech innovation basket', 4200, 20.0],
+  ['Agri-tech value fund', 1700, 8.6],
+  ['Clean water municipal bond', 1400, 6.2],
+  ['Emerging fintec equity', 3600, 17.8],
+  ['High-dividend utilities', 2600, 11.9],
+  ['Aerospace defense index', 4400, 18.4],
+  ['Legacy retail turnaround', 1600, -2.5],
+  ['Robotics automation ETF', 3900, 18.9],
+  ['Digital payments trust', 2400, 13.8],
+  ['Battery materials fund', 3100, 14.6],
+  ['Speculative commodity note', 1900, -4.0],
+  ['Mid-cap industrial growth', 2750, 14.2],
 ];
 
 export function getDefaultDatasets(): Record<Mode, Dataset> {
@@ -211,6 +269,7 @@ export function solveStrategy(
   let boundPruned = 0;
   let infeasiblePruned = 0;
   let expanded = 0;
+  let maxQueueSize = 0;
   const progress: SearchFrame[] = [];
 
   const frontierLen = () => (strategy === 'fifo' ? queue.length - qHead : heap.length);
@@ -243,6 +302,8 @@ export function solveStrategy(
     } else {
       heap.push({ negBound: -node.bound, id: node.id, node });
     }
+    const curQ = frontierLen();
+    if (curQ > maxQueueSize) maxQueueSize = curQ;
     if (traceMap.size < 30) {
       const tNode: TraceNode = {
         id: node.id,
@@ -349,6 +410,7 @@ export function solveStrategy(
     infeasible_pruned: infeasiblePruned,
     expanded,
     frontier_remaining: remaining,
+    max_queue_size: maxQueueSize,
     elapsed_ms: Math.max(0.01, Number((performance.now() - start).toFixed(3))),
     proven_optimal: remaining === 0,
     stop_reason: stopReason,
@@ -546,4 +608,326 @@ export function computeLocalRun(snapshot: Snapshot, onProgress?: (event: any) =>
   };
   registerRunInMemory(run);
   return run;
+}
+
+// --- Client-side fallback implementations for Benchmarking, Sensitivity, and CSV export ---
+
+function generateLocalBenchmarkDataset(
+  mode: Mode,
+  size: number,
+  seed = 42,
+  customItems?: Item[],
+  explicitBudget?: string
+): { items: Item[]; budget: string } {
+  const items: Item[] = [];
+  if (customItems && customItems.length > 0) {
+    const baseLen = customItems.length;
+    for (let idx = 0; idx < size; idx++) {
+      const src = customItems[idx % baseLen];
+      if (idx < baseLen) {
+        items.push({ id: `bench-${size}-${idx + 1}`, name: src.name, cost: src.cost, score: src.score });
+      } else {
+        const factor = 0.85 + (0.35 * ((idx * 7 + seed) % 11)) / 10;
+        const nextCost = Math.max(1, Math.min(10000000, Number((Number(src.cost) * factor).toFixed(2))));
+        const delta = ((idx * 5 + seed) % 9 - 4) * 1.25;
+        let nextScore = Number((Number(src.score) + delta).toFixed(2));
+        if (mode === 'shopping') nextScore = Math.max(0, Math.min(100, nextScore));
+        items.push({
+          id: `bench-${size}-${idx + 1}`,
+          name: `${src.name} #${idx + 1}`,
+          cost: nextCost.toFixed(2),
+          score: nextScore.toFixed(2),
+        });
+      }
+    }
+  } else {
+    const pool = mode === 'shopping' ? SHOPPING_BENCHMARK_POOL : INVESTMENT_BENCHMARK_POOL;
+    for (let idx = 0; idx < size; idx++) {
+      const [baseName, baseCost, baseScore] = pool[idx % pool.length];
+      const pseudo = ((seed * 31 + size * 17 + idx * 13) % 29) - 12;
+      const costVal = Math.max(100, baseCost + pseudo * 15);
+      let scoreVal = baseScore + (((seed + idx * 7) % 9) - 4);
+      if (mode === 'shopping') scoreVal = Math.max(5, Math.min(100, Math.round(scoreVal)));
+      items.push({
+        id: `${mode}-b${size}-${idx + 1}`,
+        name: idx < pool.length ? baseName : `${baseName} ${idx + 1}`,
+        cost: costVal.toFixed(2),
+        score: scoreVal.toFixed(2),
+      });
+    }
+  }
+
+  let budgetNum = explicitBudget !== undefined ? Number(explicitBudget) : NaN;
+  if (!Number.isFinite(budgetNum)) {
+    const posSum = items.reduce((acc, it) => (Number(it.score) > 0 ? acc + Number(it.cost) : acc), 0);
+    budgetNum = Math.round((posSum > 0 ? posSum : 10000) * 0.45);
+  }
+  return { items, budget: budgetNum.toFixed(2) };
+}
+
+function median(values: number[]): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 !== 0 ? sorted[mid] : Number(((sorted[mid - 1] + sorted[mid]) / 2).toFixed(3));
+}
+
+export function runLocalBenchmarkSuite(req: BenchmarkRequestPayload): BenchmarkResponse {
+  const uniqueSizes = Array.from(new Set(req.sizes)).sort((a, b) => a - b);
+  // Warm-up run
+  const warm = generateLocalBenchmarkDataset(req.mode, Math.min(5, uniqueSizes[0] || 5), req.seed || 42);
+  solveStrategy({ mode: req.mode, items: warm.items, budget: warm.budget, max_nodes: 500, time_limit_ms: 250 }, 'fifo');
+  solveStrategy({ mode: req.mode, items: warm.items, budget: warm.budget, max_nodes: 500, time_limit_ms: 250 }, 'lc');
+
+  const rows: BenchmarkRow[] = uniqueSizes.map(size => {
+    const { items, budget } = generateLocalBenchmarkDataset(
+      req.mode,
+      size,
+      req.seed || 42,
+      req.dataset_source === 'custom' ? req.custom_items : undefined,
+      req.budget
+    );
+    const snap: Snapshot = {
+      mode: req.mode,
+      items,
+      budget,
+      max_nodes: req.max_nodes,
+      time_limit_ms: req.time_limit_ms,
+    };
+
+    const measure = (strat: 'fifo' | 'lc'): BenchmarkAlgorithmMetrics => {
+      const times: number[] = [];
+      let last!: SolverResult;
+      for (let r = 0; r < req.repetitions; r++) {
+        last = solveStrategy(snap, strat);
+        times.push(last.elapsed_ms);
+      }
+      return {
+        strategy: strat,
+        execution_time_ms: median(times),
+        min_time_ms: Math.min(...times),
+        max_time_ms: Math.max(...times),
+        nodes_generated: last.generated,
+        nodes_explored: last.visited,
+        nodes_pruned: last.pruned,
+        bound_pruned: last.bound_pruned,
+        infeasible_pruned: last.infeasible_pruned,
+        max_queue_size: last.max_queue_size ?? 0,
+        optimal_value: last.total_score,
+        selected_cost: last.total_cost,
+        remaining_budget: last.remaining_budget,
+        selected_ids: last.selected_ids,
+        proven_optimal: last.proven_optimal,
+        stop_reason: last.stop_reason,
+      };
+    };
+
+    const fifo = measure('fifo');
+    const lc = measure('lc');
+    const dp = solveDP(snap);
+
+    const fifoMatchesDp = fifo.optimal_value === dp.total_score;
+    const lcMatchesDp = lc.optimal_value === dp.total_score;
+    const fifoMatchesLc = fifo.optimal_value === lc.optimal_value;
+    const allProven = fifo.proven_optimal && lc.proven_optimal && dp.proven_optimal;
+    const allAgree = allProven && fifoMatchesDp && lcMatchesDp && fifoMatchesLc;
+
+    const statusLabel = allAgree
+      ? 'Verified Optimal (FIFO = LC = DP)'
+      : fifoMatchesDp && lcMatchesDp
+      ? 'Values match, but search capped'
+      : 'Suboptimal / Divergent due to execution limit';
+
+    return {
+      dataset_size: size,
+      budget: Number(budget),
+      fifo,
+      lc,
+      verification: {
+        dp_optimal_value: dp.total_score,
+        dp_selected_cost: dp.total_cost,
+        dp_selected_ids: dp.selected_ids,
+        dp_states_explored: dp.states_explored,
+        dp_execution_time_ms: dp.elapsed_ms,
+        dp_proven_optimal: dp.proven_optimal,
+        dp_stop_reason: dp.stop_reason,
+        fifo_matches_dp: fifoMatchesDp,
+        lc_matches_dp: lcMatchesDp,
+        fifo_matches_lc: fifoMatchesLc,
+        all_agree: allAgree,
+        status_label: statusLabel,
+      },
+    };
+  });
+
+  return {
+    mode: req.mode,
+    dataset_source: req.dataset_source,
+    repetitions: req.repetitions,
+    warmup_performed: true,
+    generated_at: new Date().toISOString(),
+    hardware_note:
+      'Measured using high-resolution performance timers (median across repetitions after warm-up). Actual execution time depends on hardware and runtime conditions.',
+    rows,
+  };
+}
+
+export function runLocalSensitivityAnalysis(req: SensitivityRequestPayload): SensitivityResponse {
+  const minB = Number(req.min_budget);
+  const maxB = Number(req.max_budget);
+  const count = Math.max(2, req.intervals);
+  const budgets: number[] = [];
+  for (let i = 0; i < count; i++) {
+    const val = minB === maxB ? minB : minB + ((maxB - minB) * i) / (count - 1);
+    const rounded = Number(val.toFixed(2));
+    if (!budgets.length || budgets[budgets.length - 1] !== rounded) budgets.push(rounded);
+  }
+
+  const nameMap = new Map(req.items.map(i => [i.id, i.name]));
+  const points: SensitivityPoint[] = budgets.map((b, idx) => {
+    const snap: Snapshot = {
+      mode: req.mode,
+      items: req.items,
+      budget: b.toFixed(2),
+      max_nodes: req.max_nodes,
+      time_limit_ms: req.time_limit_ms,
+    };
+    const lc = solveStrategy(snap, 'lc');
+    const dp = solveDP(snap);
+    const fifo = req.include_fifo_comparison ? solveStrategy(snap, 'fifo') : null;
+    const verified =
+      lc.proven_optimal &&
+      dp.proven_optimal &&
+      lc.total_score === dp.total_score &&
+      (!fifo || (fifo.proven_optimal && fifo.total_score === dp.total_score));
+
+    return {
+      step_index: idx + 1,
+      budget: b,
+      recommended_strategy: 'lc',
+      optimal_score: lc.total_score,
+      total_expenditure: lc.total_cost,
+      remaining_budget: lc.remaining_budget,
+      selected_item_count: lc.selected_ids.length,
+      selected_ids: lc.selected_ids,
+      selected_names: lc.selected_ids.map(id => nameMap.get(id) || id),
+      lc_score: lc.total_score,
+      lc_cost: lc.total_cost,
+      lc_time_ms: lc.elapsed_ms,
+      lc_visited: lc.visited,
+      lc_pruned: lc.pruned,
+      lc_proven_optimal: lc.proven_optimal,
+      lc_stop_reason: lc.stop_reason,
+      fifo_score: fifo ? fifo.total_score : null,
+      fifo_cost: fifo ? fifo.total_cost : null,
+      fifo_time_ms: fifo ? fifo.elapsed_ms : null,
+      fifo_visited: fifo ? fifo.visited : null,
+      fifo_pruned: fifo ? fifo.pruned : null,
+      fifo_proven_optimal: fifo ? fifo.proven_optimal : null,
+      fifo_stop_reason: fifo ? fifo.stop_reason : null,
+      dp_score: dp.total_score,
+      dp_proven_optimal: dp.proven_optimal,
+      verified_optimal: verified,
+      verification_status: verified ? 'Verified Optimal (Matches DP)' : 'Search Capped — Not Proven Optimal',
+    };
+  });
+
+  const insights: SensitivityInsight[] = [];
+  if (points.length > 0) {
+    const first = points[0];
+    const last = points[points.length - 1];
+    const gain = Number((last.optimal_score - first.optimal_score).toFixed(2));
+    if (gain > 0) {
+      insights.push({
+        category: 'improvement',
+        title: 'Budget expansion increased achievable score',
+        description: `Increasing the available budget from ₹${first.budget.toLocaleString('en-IN')} to ₹${last.budget.toLocaleString('en-IN')} improved the maximum achievable score from ${first.optimal_score} to ${last.optimal_score} (+${gain} points).`,
+      });
+    } else {
+      insights.push({
+        category: 'plateau',
+        title: 'Selected budget range did not alter optimal score',
+        description: `Across ₹${first.budget.toLocaleString('en-IN')} to ₹${last.budget.toLocaleString('en-IN')}, the optimal achievable score remained constant at ${first.optimal_score} points.`,
+      });
+    }
+    for (let i = 1; i < points.length; i++) {
+      if (points[i].selected_ids.join(',') === points[i - 1].selected_ids.join(',')) {
+        insights.push({
+          category: 'plateau',
+          title: 'Stepwise budget plateau detected',
+          description: `Increasing the budget from ₹${points[i - 1].budget.toLocaleString('en-IN')} to ₹${points[i].budget.toLocaleString('en-IN')} did not change the selected combination (score stayed ${points[i].optimal_score} points).`,
+        });
+        break;
+      }
+    }
+  }
+
+  return {
+    mode: req.mode,
+    min_budget: minB,
+    max_budget: maxB,
+    intervals: points.length,
+    generated_at: new Date().toISOString(),
+    points,
+    insights,
+  };
+}
+
+export function buildLocalBenchmarkCsv(bench: BenchmarkResponse): string {
+  const headers = [
+    'Dataset Size',
+    'Mode',
+    'Budget (INR)',
+    'Algorithm',
+    'Execution Time Median (ms)',
+    'Execution Time Min (ms)',
+    'Execution Time Max (ms)',
+    'Nodes Generated',
+    'Nodes Explored',
+    'Nodes Pruned',
+    'Bound Pruned',
+    'Infeasible Pruned',
+    'Max Queue Size',
+    'Optimal Value',
+    'Selected Cost (INR)',
+    'Remaining Budget (INR)',
+    'Proven Optimal',
+    'Stop Reason',
+    'DP Optimal Value',
+    'Matches DP',
+    'Verification Status',
+  ];
+  const lines = [headers.join(',')];
+  for (const row of bench.rows) {
+    for (const [m, matchDp] of [
+      [row.fifo, row.verification.fifo_matches_dp],
+      [row.lc, row.verification.lc_matches_dp],
+    ] as const) {
+      lines.push(
+        [
+          row.dataset_size,
+          bench.mode,
+          row.budget.toFixed(2),
+          m.strategy.toUpperCase(),
+          m.execution_time_ms.toFixed(3),
+          m.min_time_ms.toFixed(3),
+          m.max_time_ms.toFixed(3),
+          m.nodes_generated,
+          m.nodes_explored,
+          m.nodes_pruned,
+          m.bound_pruned,
+          m.infeasible_pruned,
+          m.max_queue_size,
+          m.optimal_value.toFixed(2),
+          m.selected_cost.toFixed(2),
+          m.remaining_budget.toFixed(2),
+          m.proven_optimal ? 'Yes' : 'No',
+          m.stop_reason || 'completed',
+          row.verification.dp_optimal_value.toFixed(2),
+          matchDp ? 'Yes' : 'No',
+          `"${row.verification.status_label.replace(/"/g, '""')}"`,
+        ].join(',')
+      );
+    }
+  }
+  return lines.join('\n');
 }

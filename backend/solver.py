@@ -9,14 +9,19 @@ from collections import deque
 from dataclasses import dataclass
 from fractions import Fraction
 import heapq
+import sys
 from time import perf_counter
+from typing import Optional
 from models import SolveRequest, SolverResult, TraceNode, SearchFrame
 
 
-@dataclass(slots=True)
+_dataclass_kwargs = {'slots': True} if sys.version_info >= (3, 10) else {}
+
+
+@dataclass(**_dataclass_kwargs)
 class Node:
     id: int
-    parent: int | None
+    parent: Optional[int]
     depth: int
     cost: int
     score: int
@@ -54,6 +59,7 @@ def solve(request: SolveRequest, strategy: str, on_progress=None) -> SolverResul
     trace: dict[int, TraceNode] = {}
     best_score, best_cost, best_indices = 0, 0, ()
     generated, visited, bound_pruned, infeasible_pruned, expanded = 0, 0, 0, 0, 0
+    max_queue_size = 0
     progress = []
 
     def record():
@@ -67,12 +73,16 @@ def solve(request: SolveRequest, strategy: str, on_progress=None) -> SolverResul
                          'trace': [t.model_dump() for t in trace.values()]})
 
     def push(node):
-        nonlocal generated
+        nonlocal generated, max_queue_size
         generated += 1
         if strategy == 'fifo':
             queue.append(node)
+            current_q = len(queue)
         else:
             heapq.heappush(heap, (-node.bound, node.id, node))
+            current_q = len(heap)
+        if current_q > max_queue_size:
+            max_queue_size = current_q
         if len(trace) < 30:
             trace[node.id] = TraceNode(
                 id=node.id, parent=node.parent, depth=node.depth, decision=node.decision,
@@ -139,6 +149,7 @@ def solve(request: SolveRequest, strategy: str, on_progress=None) -> SolverResul
         remaining_budget=(budget - best_cost) / 100, visited=visited, generated=generated,
         pruned=bound_pruned + infeasible_pruned, bound_pruned=bound_pruned,
         infeasible_pruned=infeasible_pruned, expanded=expanded, frontier_remaining=remaining,
+        max_queue_size=max_queue_size,
         elapsed_ms=round((perf_counter() - start) * 1000, 3), proven_optimal=remaining == 0,
         stop_reason=stop_reason, trace=list(trace.values()), trace_omitted=generated - len(trace), progress=progress)
 

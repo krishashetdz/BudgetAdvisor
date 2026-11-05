@@ -10,15 +10,128 @@ from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse, StreamingResponse, FileResponse
+from fastapi.responses import JSONResponse, StreamingResponse, FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.concurrency import run_in_threadpool
-from motor.motor_asyncio import AsyncIOMotorClient
 from starlette.middleware.cors import CORSMiddleware
-from models import Dataset, Run, SaveRequest, SolveRequest
+from models import (
+    BenchmarkRequest,
+    BenchmarkResponse,
+    Dataset,
+    ReportExportRequest,
+    Run,
+    SaveRequest,
+    SensitivityRequest,
+    SensitivityResponse,
+    SolveRequest,
+)
 from samples import SAMPLES
 from solver import solve_pair
 from computation import compute_run
+from benchmark import run_benchmark_suite
+from sensitivity import run_sensitivity_analysis
+from report_generator import generate_optimization_pdf_report, generate_benchmark_csv
+
+
+class _InMemoryCursor:
+    def __init__(self, docs: list[dict]):
+        self._docs = docs
+
+    def sort(self, key: str, direction: int = 1):
+        reverse = direction < 0
+        self._docs.sort(key=lambda d: d.get(key, ''), reverse=reverse)
+        return self
+
+    async def to_list(self, length: int):
+        return self._docs[:length]
+
+
+class _InMemoryCollection:
+    def __init__(self):
+        self._rows: list[dict] = []
+
+    async def create_index(self, *args, **kwargs):
+        return None
+
+    async def update_one(self, flt: dict, update: dict, upsert: bool = False):
+        target = next((r for r in self._rows if all(r.get(k) == v for k, v in flt.items())), None)
+        if target is None:
+            if upsert:
+                doc = dict(flt)
+                if '$setOnInsert' in update:
+                    doc.update(json.loads(json.dumps(update['$setOnInsert'])))
+                if '$set' in update:
+                    doc.update(json.loads(json.dumps(update['$set'])))
+                self._rows.append(doc)
+            return
+        if '$set' in update:
+            target.update(json.loads(json.dumps(update['$set'])))
+        if '$unset' in update:
+            for k in update['$unset']:
+                target.pop(k, None)
+
+    def _project(self, doc: dict, projection: dict | None) -> dict:
+        copy = json.loads(json.dumps(doc, default=str))
+        if not projection:
+            copy.pop('_id', None)
+            return copy
+        include_keys = [k for k, v in projection.items() if v and k != '_id']
+        exclude_keys = [k for k, v in projection.items() if not v]
+        if include_keys:
+            return {k: copy[k] for k in include_keys if k in copy}
+        for k in exclude_keys:
+            copy.pop(k, None)
+        return copy
+
+    def find(self, flt: dict, projection: dict | None = None):
+        matched = [
+            self._project(r, projection)
+            for r in self._rows
+            if all(r.get(k) == v for k, v in flt.items())
+        ]
+        return _InMemoryCursor(matched)
+
+    async def find_one(self, flt: dict, projection: dict | None = None):
+        target = next((r for r in self._rows if all(r.get(k) == v for k, v in flt.items())), None)
+        if target is None:
+            return None
+        return self._project(target, projection)
+
+    async def insert_one(self, doc: dict):
+        self._rows.append(dict(doc))
+
+    async def count_documents(self, flt: dict) -> int:
+        return sum(1 for r in self._rows if all(r.get(k) == v for k, v in flt.items()))
+
+    async def delete_one(self, flt: dict):
+        class _DelRes:
+            def __init__(self, count: int):
+                self.deleted_count = count
+        for idx, r in enumerate(self._rows):
+            if all(r.get(k) == v for k, v in flt.items()):
+                self._rows.pop(idx)
+                return _DelRes(1)
+        return _DelRes(0)
+
+
+class _InMemoryDB:
+    def __init__(self):
+        self.datasets = _InMemoryCollection()
+        self.runs = _InMemoryCollection()
+
+
+class _InMemoryClient:
+    def __init__(self):
+        self._dbs: dict[str, _InMemoryDB] = {}
+
+    def __getitem__(self, name: str) -> _InMemoryDB:
+        if name not in self._dbs:
+            self._dbs[name] = _InMemoryDB()
+        return self._dbs[name]
+
+    def close(self):
+        pass
+
 
 load_dotenv(Path(__file__).parent / '.env')
 mongo_url = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
@@ -26,9 +139,11 @@ db_name = os.environ.get('DB_NAME', 'test_database')
 cors_origins = [o.strip() for o in os.environ.get('CORS_ORIGINS', '*').split(',') if o.strip()] or ['*']
 
 use_mock = os.environ.get('USE_MOCK_MONGO', '').lower() in ('1', 'true', 'yes')
+client = None
 if not use_mock:
     try:
         import socket
+        from motor.motor_asyncio import AsyncIOMotorClient
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.settimeout(0.5)
         host = 'localhost'
@@ -44,41 +159,74 @@ if not use_mock:
     except Exception:
         use_mock = True
 
-if use_mock:
-    from mongomock_motor import AsyncMongoMockClient
-    logging.info("Using in-memory MongoMock database")
-    client = AsyncMongoMockClient()
+if use_mock or client is None:
+    try:
+        from mongomock_motor import AsyncMongoMockClient
+        logging.info("Using in-memory MongoMock database")
+        client = AsyncMongoMockClient()
+    except ImportError:
+        logging.info("Using built-in in-memory database fallback")
+        client = _InMemoryClient()
 
 db = client[db_name]
 slots = asyncio.Semaphore(2)
 
 
+async def _ensure_seeded():
+    if await db.datasets.count_documents({}) == 0:
+        await db.datasets.create_index('mode', unique=True)
+        await db.runs.create_index('id', unique=True)
+        await db.runs.create_index('expires_at', expireAfterSeconds=0)
+        for sample in SAMPLES:
+            await db.datasets.update_one({'mode': sample['mode']}, {'$setOnInsert': sample}, upsert=True)
+
+
 @asynccontextmanager
 async def lifespan(app):
-    await db.datasets.create_index('mode', unique=True)
-    await db.runs.create_index('id', unique=True)
-    await db.runs.create_index('expires_at', expireAfterSeconds=0)
-    for sample in SAMPLES:
-        await db.datasets.update_one({'mode': sample['mode']}, {'$setOnInsert': sample}, upsert=True)
+    await _ensure_seeded()
     yield
     client.close()
 
 
+class BoundedBodyMiddleware:
+    def __init__(self, app, max_bytes: int = 32768):
+        self.app = app
+        self.max_bytes = max_bytes
+
+    async def __call__(self, scope, receive, send):
+        if scope['type'] != 'http' or scope.get('method') not in ('POST', 'PUT', 'PATCH'):
+            await self.app(scope, receive, send)
+            return
+        body = bytearray()
+        more_body = True
+        while more_body:
+            message = await receive()
+            if message['type'] == 'http.request':
+                chunk = message.get('body', b'')
+                body.extend(chunk)
+                if len(body) > self.max_bytes:
+                    response = JSONResponse(status_code=413, content={'detail': 'Request exceeds the 32 KB limit.'})
+                    await response(scope, receive, send)
+                    return
+                more_body = message.get('more_body', False)
+            elif message['type'] == 'http.disconnect':
+                return
+        sent = False
+
+        async def replay_receive():
+            nonlocal sent
+            if not sent:
+                sent = True
+                return {'type': 'http.request', 'body': bytes(body), 'more_body': False}
+            return await receive()
+
+        await self.app(scope, replay_receive, send)
+
+
 app = FastAPI(title='Budget Advisor', lifespan=lifespan)
+app.add_middleware(BoundedBodyMiddleware, max_bytes=32768)
 app.add_middleware(CORSMiddleware, allow_origins=cors_origins,
                    allow_credentials=False, allow_methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], allow_headers=['*'])
-
-
-@app.middleware('http')
-async def bounded_body(request: Request, call_next):
-    if request.method in ('POST', 'PUT', 'PATCH'):
-        body = bytearray()
-        async for chunk in request.stream():
-            body.extend(chunk)
-            if len(body) > 32768:
-                return JSONResponse(status_code=413, content={'detail': 'Request exceeds the 32 KB limit.'})
-        request._body = bytes(body)
-    return await call_next(request)
 
 
 @app.exception_handler(RequestValidationError)
@@ -94,6 +242,7 @@ async def health():
 
 @app.get('/api/datasets', response_model=list[Dataset])
 async def datasets():
+    await _ensure_seeded()
     return await db.datasets.find({}, {'_id': 0}).to_list(2)
 
 
@@ -161,6 +310,74 @@ async def stream_compute(snapshot: SolveRequest):
                 task.result()
     return StreamingResponse(events(), media_type='application/x-ndjson',
                              headers={'X-Accel-Buffering': 'no', 'Cache-Control': 'no-cache'})
+
+
+# --- FEATURE 1 ENDPOINT: PERFORMANCE BENCHMARKING ---
+
+@app.post('/api/benchmark', response_model=BenchmarkResponse)
+async def execute_benchmark(req: BenchmarkRequest):
+    try:
+        await asyncio.wait_for(slots.acquire(), timeout=0.25)
+    except asyncio.TimeoutError:
+        raise HTTPException(429, 'Two searches are already running. Please try again shortly.')
+    try:
+        return await run_in_threadpool(run_benchmark_suite, req)
+    finally:
+        slots.release()
+
+
+# --- FEATURE 2 ENDPOINT: WHAT-IF BUDGET SENSITIVITY ANALYSIS ---
+
+@app.post('/api/sensitivity', response_model=SensitivityResponse)
+async def execute_sensitivity(req: SensitivityRequest):
+    try:
+        await asyncio.wait_for(slots.acquire(), timeout=0.25)
+    except asyncio.TimeoutError:
+        raise HTTPException(429, 'Two searches are already running. Please try again shortly.')
+    try:
+        return await run_in_threadpool(run_sensitivity_analysis, req)
+    finally:
+        slots.release()
+
+
+# --- FEATURE 3 ENDPOINTS: PDF & CSV REPORT EXPORT ---
+
+@app.post('/api/report/pdf')
+async def export_pdf_report(req: ReportExportRequest):
+    try:
+        await asyncio.wait_for(slots.acquire(), timeout=0.25)
+    except asyncio.TimeoutError:
+        raise HTTPException(429, 'Two searches are already running. Please try again shortly.')
+    try:
+        pdf_bytes = await run_in_threadpool(generate_optimization_pdf_report, req)
+    finally:
+        slots.release()
+    safe_mode = req.mode.lower()
+    filename = f'budgetadvisor_{safe_mode}_report.pdf'
+    return Response(
+        content=pdf_bytes,
+        media_type='application/pdf',
+        headers={'Content-Disposition': f'attachment; filename="{filename}"'},
+    )
+
+
+@app.post('/api/report/csv')
+async def export_benchmark_csv(req: BenchmarkRequest):
+    try:
+        await asyncio.wait_for(slots.acquire(), timeout=0.25)
+    except asyncio.TimeoutError:
+        raise HTTPException(429, 'Two searches are already running. Please try again shortly.')
+    try:
+        bench_result = await run_in_threadpool(run_benchmark_suite, req)
+        csv_text = generate_benchmark_csv(bench_result)
+    finally:
+        slots.release()
+    filename = f'budgetadvisor_{req.mode}_benchmark.csv'
+    return Response(
+        content=csv_text.encode('utf-8'),
+        media_type='text/csv; charset=utf-8',
+        headers={'Content-Disposition': f'attachment; filename="{filename}"'},
+    )
 
 
 @app.get('/api/runs', response_model=list[Run])
