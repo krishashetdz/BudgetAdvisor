@@ -1,5 +1,12 @@
 import axios from 'axios';
-export const api = axios.create({ baseURL: `${process.env.REACT_APP_BACKEND_URL || ''}/api`, timeout: 20000 });
+
+let rawUrl = (process.env.REACT_APP_BACKEND_URL || '').trim();
+if (rawUrl && !rawUrl.startsWith('http://') && !rawUrl.startsWith('https://')) {
+  rawUrl = `https://${rawUrl}`;
+}
+rawUrl = rawUrl.replace(/\/+$/, '');
+
+export const api = axios.create({ baseURL: `${rawUrl}/api`, timeout: 20000 });
 export function errorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {
     const detail = error.response?.data?.detail;

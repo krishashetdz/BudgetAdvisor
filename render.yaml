@@ -38,7 +38,4 @@ services:
       - key: DISABLE_ESLINT_PLUGIN
         value: "true"
       - key: REACT_APP_BACKEND_URL
-        fromService:
-          type: web
-          name: budget-advisor-backend
-          property: host
+        value: https://budget-advisor-backend.onrender.com
