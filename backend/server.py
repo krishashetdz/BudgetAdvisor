@@ -10,7 +10,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.concurrency import run_in_threadpool
 from motor.motor_asyncio import AsyncIOMotorClient
 from starlette.middleware.cors import CORSMiddleware
@@ -22,6 +23,7 @@ from computation import compute_run
 load_dotenv(Path(__file__).parent / '.env')
 mongo_url = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
 db_name = os.environ.get('DB_NAME', 'test_database')
+cors_origins = [o.strip() for o in os.environ.get('CORS_ORIGINS', '*').split(',') if o.strip()] or ['*']
 
 use_mock = os.environ.get('USE_MOCK_MONGO', '').lower() in ('1', 'true', 'yes')
 if not use_mock:
@@ -63,8 +65,8 @@ async def lifespan(app):
 
 
 app = FastAPI(title='Budget Advisor', lifespan=lifespan)
-app.add_middleware(CORSMiddleware, allow_origins=os.environ['CORS_ORIGINS'].split(','),
-                   allow_credentials=False, allow_methods=['GET', 'POST', 'PUT', 'DELETE'], allow_headers=['*'])
+app.add_middleware(CORSMiddleware, allow_origins=cors_origins,
+                   allow_credentials=False, allow_methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], allow_headers=['*'])
 
 
 @app.middleware('http')
@@ -193,18 +195,15 @@ async def delete_run(run_id: str):
     return {'deleted': True}
 
 
-# Serve React build in production when available
-frontend_build = Path(__file__).resolve().parent.parent / 'frontend' / 'build'
-if (frontend_build / 'index.html').is_file():
-    from fastapi.staticfiles import StaticFiles
-    from starlette.responses import FileResponse
-
-    if (frontend_build / 'static').is_dir():
-        app.mount('/static', StaticFiles(directory=str(frontend_build / 'static')), name='static')
+FRONTEND_BUILD_DIR = Path(__file__).resolve().parent.parent / 'frontend' / 'build'
+if FRONTEND_BUILD_DIR.is_dir():
+    static_dir = FRONTEND_BUILD_DIR / 'static'
+    if static_dir.is_dir():
+        app.mount('/static', StaticFiles(directory=str(static_dir)), name='static')
 
     @app.get('/{full_path:path}')
-    async def serve_frontend(full_path: str):
-        target = frontend_build / full_path
-        if full_path and target.is_file():
-            return FileResponse(target)
-        return FileResponse(frontend_build / 'index.html')
+    async def serve_spa(full_path: str):
+        candidate = FRONTEND_BUILD_DIR / full_path
+        if full_path and candidate.is_file():
+            return FileResponse(str(candidate))
+        return FileResponse(str(FRONTEND_BUILD_DIR / 'index.html'))

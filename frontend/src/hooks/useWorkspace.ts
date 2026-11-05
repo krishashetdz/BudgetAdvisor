@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { api, errorMessage } from '../api';
+import { fetchDatasets, errorMessage } from '../api';
 import { Dataset, Item, Mode, Run, Snapshot, LiveProgress } from '../types';
 import { streamSearch } from '../stream';
 import { useDraftHistory } from './useDraftHistory';
@@ -62,7 +62,7 @@ export function useWorkspace() {
   const initialize = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      const { data } = await api.get<Dataset[]>('/datasets');
+      const data = await fetchDatasets();
       const all = Object.fromEntries(data.map(d => [d.mode, d])) as Record<Mode, Dataset>;
       samples.current = all; seed(all); setLoading(false);
       await compute(all.shopping);
@@ -99,7 +99,17 @@ export function useWorkspace() {
     if (JSON.stringify(next.data) !== JSON.stringify(h.present.data)) invalidate();
     history.navigate(mode, direction);
   };
-  const switchMode = (next: Mode) => { if (next !== mode) { endEdit(); invalidate(); setMode(next); } };
+  const switchMode = (next: Mode) => {
+    if (next !== mode) {
+      endEdit();
+      invalidate();
+      setMode(next);
+      const nextData = history.state?.[next]?.present.data || samples.current?.[next];
+      if (nextData) {
+        void compute(nextData, maxNodes);
+      }
+    }
+  };
   const restore = (saved: Run) => {
     invalidate(); editGroup.current = null; setMode(saved.snapshot.mode); setMaxNodes(saved.snapshot.max_nodes);
     history.restore(saved.snapshot.mode, { data: saved.snapshot,
@@ -120,6 +130,7 @@ export function useWorkspace() {
       invalidate(); editGroup.current = null;
       const sample = samples.current[mode];
       history.change(mode, () => ({ data: sample, selectedIds: [], followsRecommendation: true }));
+      void compute(sample, maxNodes);
       toast.success('Sample dataset restored');
     },
   };
