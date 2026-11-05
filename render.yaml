@@ -1,0 +1,41 @@
+services:
+  # Backend FastAPI Web Service
+  - type: web
+    name: budget-advisor-backend
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: MONGO_URL
+        value: mongodb://localhost:27017
+      - key: DB_NAME
+        value: budget_advisor
+      - key: CORS_ORIGINS
+        value: "*"
+      - key: USE_MOCK_MONGO
+        value: "true"
+
+  # Frontend React Static Site
+  - type: web
+    name: budget-advisor-frontend
+    runtime: static
+    plan: free
+    rootDir: frontend
+    buildCommand: CI=false npm install && CI=false npm run build
+    staticPublishPath: build
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: NODE_VERSION
+        value: 20.12.0
+      - key: REACT_APP_BACKEND_URL
+        fromService:
+          type: web
+          name: budget-advisor-backend
+          property: host

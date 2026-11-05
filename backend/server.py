@@ -191,3 +191,20 @@ async def delete_run(run_id: str):
     if not deleted.deleted_count:
         raise HTTPException(404, 'Saved run not found.')
     return {'deleted': True}
+
+
+# Serve React build in production when available
+frontend_build = Path(__file__).resolve().parent.parent / 'frontend' / 'build'
+if (frontend_build / 'index.html').is_file():
+    from fastapi.staticfiles import StaticFiles
+    from starlette.responses import FileResponse
+
+    if (frontend_build / 'static').is_dir():
+        app.mount('/static', StaticFiles(directory=str(frontend_build / 'static')), name='static')
+
+    @app.get('/{full_path:path}')
+    async def serve_frontend(full_path: str):
+        target = frontend_build / full_path
+        if full_path and target.is_file():
+            return FileResponse(target)
+        return FileResponse(frontend_build / 'index.html')

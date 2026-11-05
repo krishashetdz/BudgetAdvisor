@@ -1,5 +1,5 @@
 import axios from 'axios';
-export const api = axios.create({ baseURL: `${process.env.REACT_APP_BACKEND_URL}/api`, timeout: 20000 });
+export const api = axios.create({ baseURL: `${process.env.REACT_APP_BACKEND_URL || ''}/api`, timeout: 20000 });
 export function errorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {
     const detail = error.response?.data?.detail;
