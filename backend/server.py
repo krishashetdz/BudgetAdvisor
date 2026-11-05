@@ -20,8 +20,34 @@ from solver import solve_pair
 from computation import compute_run
 
 load_dotenv(Path(__file__).parent / '.env')
-client = AsyncIOMotorClient(os.environ['MONGO_URL'])
-db = client[os.environ['DB_NAME']]
+mongo_url = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
+db_name = os.environ.get('DB_NAME', 'test_database')
+
+use_mock = os.environ.get('USE_MOCK_MONGO', '').lower() in ('1', 'true', 'yes')
+if not use_mock:
+    try:
+        import socket
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(0.5)
+        host = 'localhost'
+        port = 27017
+        if '://' in mongo_url:
+            parts = mongo_url.split('://', 1)[1].split('/')[0].split(':')
+            host = parts[0]
+            if len(parts) > 1:
+                port = int(parts[1])
+        s.connect((host, port))
+        s.close()
+        client = AsyncIOMotorClient(mongo_url, serverSelectionTimeoutMS=2000)
+    except Exception:
+        use_mock = True
+
+if use_mock:
+    from mongomock_motor import AsyncMongoMockClient
+    logging.info("Using in-memory MongoMock database")
+    client = AsyncMongoMockClient()
+
+db = client[db_name]
 slots = asyncio.Semaphore(2)
 
 

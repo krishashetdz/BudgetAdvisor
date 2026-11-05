@@ -8,8 +8,9 @@ import requests
 from dotenv import load_dotenv
 
 
-load_dotenv("/app/frontend/.env")
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL")
+from pathlib import Path
+load_dotenv(Path(__file__).resolve().parents[2] / "frontend" / ".env")
+BASE_URL = os.environ.get("REACT_APP_BACKEND_URL") or "http://localhost:8000"
 
 if not BASE_URL:
     raise RuntimeError("REACT_APP_BACKEND_URL is required for public endpoint testing")

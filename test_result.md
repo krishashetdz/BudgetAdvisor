@@ -101,3 +101,217 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+
+user_problem_statement: "0/1 Knapsack (LC & FIFO Branch and Bound) - Budget-Constrained Shopping/Investment Advisor: picks best combination of items/stocks within a fixed budget"
+
+backend:
+  - task: "0/1 Knapsack FIFO Branch and Bound Solver"
+    implemented: true
+    working: true
+    file: "backend/solver.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "FIFO queue-based level-by-level search implemented with fractional knapsack bounding function and deterministic tie-breaking. 100% verified against exhaustive and DP baselines across 37 algorithmic tests."
+
+  - task: "0/1 Knapsack LC (Least Cost / Best-First) Branch and Bound Solver"
+    implemented: true
+    working: true
+    file: "backend/solver.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "LC priority-queue-based search with -bound key ordering. Explores highest promising bound first. Pruning and bounding verified."
+
+  - task: "Independent Dynamic Programming (DP) Baseline Solver"
+    implemented: true
+    working: true
+    file: "backend/dp_solver.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Exact sparse-cost DP recurrence verifies optimality of Branch and Bound results."
+
+  - task: "Shopping and Investment Dataset Management & API"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Endpoints /api/datasets, /api/solve, /api/solve/stream, /api/runs verified with seed shopping and investment stocks."
+
+frontend:
+  - task: "Shopping & Investment Mode Selection & Budget Controls"
+    implemented: true
+    working: true
+    file: "frontend/src/pages/Dashboard.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Mode switch for Shopping and Investment, budget slider and numeric input, customizable item table with validation."
+
+  - task: "Side-by-Side Search Race & Visual Decision Tree"
+    implemented: true
+    working: true
+    file: "frontend/src/components/SearchTree.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Live step-by-step tree visualization for FIFO vs LC with node counts, pruning stats, and replay controls."
+
+  - task: "Tri-Method Verification Strip (FIFO vs LC vs DP)"
+    implemented: true
+    working: true
+    file: "frontend/src/components/Results.tsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Comparison strip reports optimal value, compute time, and work units (nodes visited / states evaluated) with agreement checkmark."
+
+metadata:
+  created_by: "main_agent"
+  version: "1.0"
+  test_sequence: 1
+  run_ui: true
+
+test_plan:
+  current_focus:
+    - "0/1 Knapsack FIFO Branch and Bound Solver"
+    - "0/1 Knapsack LC (Least Cost / Best-First) Branch and Bound Solver"
+    - "Shopping and Investment Dataset Management & API"
+  stuck_tasks: []
+  test_all: true
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "main"
+    message: "Verified all 70 unit and integration tests across backend solvers, stream endpoints, and API contracts. Validated both Shopping and Investment modes."
+
+user_problem_statement: "0/1 Knapsack (LC & FIFO Branch and Bound) - Budget-Constrained Shopping/Investment Advisor: picks best combination of items/stocks within a fixed budget"
+
+backend:
+  - task: "0/1 Knapsack FIFO Branch and Bound Solver"
+    implemented: true
+    working: true
+    file: "backend/solver.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "FIFO queue-based level-by-level search implemented with fractional knapsack bounding function and deterministic tie-breaking. 100% verified against exhaustive and DP baselines across 37 algorithmic tests."
+
+  - task: "0/1 Knapsack LC (Least Cost / Best-First) Branch and Bound Solver"
+    implemented: true
+    working: true
+    file: "backend/solver.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "LC priority-queue-based search with -bound key ordering. Explores highest promising bound first. Pruning and bounding verified."
+
+  - task: "Independent Dynamic Programming (DP) Baseline Solver"
+    implemented: true
+    working: true
+    file: "backend/dp_solver.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Exact sparse-cost DP recurrence verifies optimality of Branch and Bound results."
+
+  - task: "Shopping and Investment Dataset Management & API"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Endpoints /api/datasets, /api/solve, /api/solve/stream, /api/runs verified with seed shopping and investment stocks."
+
+frontend:
+  - task: "Shopping & Investment Mode Selection & Budget Controls"
+    implemented: true
+    working: true
+    file: "frontend/src/pages/Dashboard.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Mode switch for Shopping and Investment, budget slider and numeric input, customizable item table with validation."
+
+  - task: "Side-by-Side Search Race & Visual Decision Tree"
+    implemented: true
+    working: true
+    file: "frontend/src/components/SearchTree.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Live step-by-step tree visualization for FIFO vs LC with node counts, pruning stats, and replay controls."
+
+  - task: "Tri-Method Verification Strip (FIFO vs LC vs DP)"
+    implemented: true
+    working: true
+    file: "frontend/src/components/Results.tsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Comparison strip reports optimal value, compute time, and work units (nodes visited / states evaluated) with agreement checkmark."
+
+metadata:
+  created_by: "main_agent"
+  version: "1.0"
+  test_sequence: 1
+  run_ui: true
+
+test_plan:
+  current_focus:
+    - "0/1 Knapsack FIFO Branch and Bound Solver"
+    - "0/1 Knapsack LC (Least Cost / Best-First) Branch and Bound Solver"
+    - "Shopping and Investment Dataset Management & API"
+  stuck_tasks: []
+  test_all: true
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "main"
+    message: "Verified all 70 unit and integration tests across backend solvers, stream endpoints, and API contracts. Validated both Shopping and Investment modes."
