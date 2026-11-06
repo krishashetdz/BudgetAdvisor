@@ -1,0 +1,11 @@
+Dataset Size,Mode,Budget (INR),Algorithm,Execution Time Median (ms),Execution Time Min (ms),Execution Time Max (ms),Nodes Generated,Nodes Explored,Nodes Pruned,Bound Pruned,Infeasible Pruned,Max Queue Size,Optimal Value,Selected Cost (INR),Remaining Budget (INR),Proven Optimal,Stop Reason,DP Optimal Value,Matches DP,Verification Status,Dataset Name,Dataset Source,Seed
+5,investment,10000.00,FIFO,0.175,0.168,0.218,19,19,9,7,2,9,48.00,9000.00,1000.00,Yes,completed,48.00,Yes,Verified Optimal (FIFO = LC = DP),Investment Portfolio Dataset,custom,42
+5,investment,10000.00,LC,0.101,0.098,0.113,11,11,5,3,2,6,48.00,9000.00,1000.00,Yes,completed,48.00,Yes,Verified Optimal (FIFO = LC = DP),Investment Portfolio Dataset,custom,42
+10,investment,10000.00,FIFO,0.350,0.348,0.376,63,63,31,17,14,19,61.00,9850.00,150.00,Yes,completed,61.00,Yes,Verified Optimal (FIFO = LC = DP),Investment Portfolio Dataset,custom,42
+10,investment,10000.00,LC,0.270,0.261,0.279,39,39,19,6,13,20,61.00,9850.00,150.00,Yes,completed,61.00,Yes,Verified Optimal (FIFO = LC = DP),Investment Portfolio Dataset,custom,42
+15,investment,10000.00,FIFO,0.545,0.504,0.655,131,131,65,25,40,20,66.50,9985.00,15.00,Yes,completed,66.50,Yes,Verified Optimal (FIFO = LC = DP),Investment Portfolio Dataset,custom,42
+15,investment,10000.00,LC,0.489,0.474,0.490,101,101,50,12,38,51,66.50,9985.00,15.00,Yes,completed,66.50,Yes,Verified Optimal (FIFO = LC = DP),Investment Portfolio Dataset,custom,42
+20,investment,10000.00,FIFO,0.543,0.532,0.548,141,141,70,24,46,24,69.00,9810.00,190.00,Yes,completed,69.00,Yes,Verified Optimal (FIFO = LC = DP),Investment Portfolio Dataset,custom,42
+20,investment,10000.00,LC,0.515,0.512,0.635,111,111,55,10,45,56,69.00,9810.00,190.00,Yes,completed,69.00,Yes,Verified Optimal (FIFO = LC = DP),Investment Portfolio Dataset,custom,42
+24,investment,10000.00,FIFO,0.611,0.597,0.615,159,159,79,44,35,45,72.50,9929.00,71.00,Yes,completed,72.50,Yes,Verified Optimal (FIFO = LC = DP),Investment Portfolio Dataset,custom,42
+24,investment,10000.00,LC,0.358,0.356,0.462,49,49,24,5,19,25,72.50,9929.00,71.00,Yes,completed,72.50,Yes,Verified Optimal (FIFO = LC = DP),Investment Portfolio Dataset,custom,42

@@ -3,10 +3,10 @@
 * **Project Title:** BudgetAdvisor — Budget-Constrained Shopping & Investment Advisor
 * **Project Group ID:** G12
 * **Team Members:**
-  * **Kris Rodrigues** — Project Lead & Systems Architect (FIFO Branch and Bound Lead)
-  * **Krisha Shet** — Algorithm & Baseline Verification Engineer (LC B&B & Sparse DP)
-  * **Megha Gobre** — Backend Infrastructure & Analytical Engines Engineer
-  * **Jeolita Parpatekar** — Frontend & UI/UX Visualization Engineer
+  * **Kris Rodrigues** - Project Lead & Systems Architect (FIFO Branch and Bound Lead)
+  * **Krisha Shet** - Algorithm & Baseline Verification Engineer (LC B&B & Sparse DP)
+  * **Megha Gobre** - Backend Infrastructure & Analytical Engines Engineer
+  * **Jeolita Parpatekar** - Frontend & UI/UX Visualization Engineer
 * **Assigned Topic:** 0/1 Knapsack Problem using FIFO Branch and Bound and Least Cost (LC) Branch and Bound
 * **Verification Baseline:** Independent Sparse-Cost 0/1 Dynamic Programming
 

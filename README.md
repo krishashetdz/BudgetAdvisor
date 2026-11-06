@@ -9,10 +9,10 @@
 - **Assigned Algorithm:** 0/1 Knapsack using FIFO Branch and Bound and Least Cost (LC) Branch and Bound
 - **Application:** Budget-Constrained Shopping / Investment Advisor
 - **Team Members:**
-  - **Kris Rodrigues** — Project Lead & Systems Architect (FIFO Branch and Bound Lead)
-  - **Krisha Shet** — Algorithm & Baseline Verification Engineer (LC B&B & Sparse DP)
-  - **Megha Gobre** — Backend Infrastructure & Analytical Engines Engineer
-  - **Jeolita Parpatekar** — Frontend & UI/UX Visualization Engineer
+  - **Kris Rodrigues** - Project Lead & Systems Architect (FIFO Branch and Bound Lead)
+  - **Krisha Shet** - Algorithm & Baseline Verification Engineer (LC B&B & Sparse DP)
+  - **Megha Gobre** - Backend Infrastructure & Analytical Engines Engineer
+  - **Jeolita Parpatekar** - Frontend & UI/UX Visualization Engineer
 
 ## 3. Problem Statement
 Given a set of $n$ indivisible items or educational investment assets ($0 \le n \le 24$), where each item $i \in \{0, 1, \dots, n-1\}$ has a positive monetary cost $c_i > 0$ and an assigned utility or additive score $v_i \in \mathbb{R}$, and given a fixed non-negative budget $B \ge 0$, determine a binary selection vector $x = (x_0, x_1, \dots, x_{n-1}) \in \{0, 1\}^n$ that maximizes total score without exceeding the available budget:
@@ -117,6 +117,14 @@ The **Performance Analysis** page (`/performance`, `frontend/src/pages/Performan
 - Executes an unrecorded **warm-up pass** followed by configurable repetitions ($1, 3, \text{or } 5$ runs) and reports the **median execution time** (plus min/max bounds).
 - Plots four comparative charts (*Execution Time vs. Dataset Size*, *Nodes Explored vs. Dataset Size*, *Nodes Pruned vs. Dataset Size*, and *Maximum Queue Size vs. Dataset Size*) alongside a full side-by-side verification table.
 
+### Custom-Derived Benchmark Datasets
+Datasets exceeding the original custom item count are expanded using reproducible variations derived from the original dataset. These additional entries are generated for algorithm scalability testing and are not independently entered real-world products.
+- **Original Dataset Size:** Number of real-world items entered in the Optimizer ($0 \le n \le 24$).
+- **Expanded Dataset Size:** Scaled benchmark sizes ($5, 10, 15, 20, 24$ items).
+- **Dataset Source:** `custom` (user-provided workspace items) vs. `generated` (standard seeded test pool).
+- **Random Seed:** Reproducible pseudo-random seed ($42$ by default).
+- **Generated Variations:** When a benchmark size exceeds the base custom item count, controlled cost factors ($0.85\text{–}1.20\times$) and utility deltas are deterministically generated to evaluate scalability without inventing unrelated products.
+
 ## 17. What-If Budget Analysis
 The **What-If Budget Analysis** page (`/what-if`, `frontend/src/pages/WhatIfAnalysis.tsx` & `backend/sensitivity.py`) performs parametric budget sensitivity analysis:
 - Evaluates a user-specified **Minimum Budget**, **Maximum Budget**, and **Budget Intervals** ($2\text{–}16$ steps in UI, up to $20$ in API) by running the actual FIFO, LC, and DP solvers at every budget step.
@@ -127,15 +135,15 @@ The **PDF Optimization Report** (`POST /api/report/pdf`, `backend/report_generat
 1. **Project and Optimization Details:** Group ID `G12`, mode, dataset name, dataset source & size, budget, associated optimization `run_id`, separated UTC timestamp in the top header bar, and Investment mode disclaimer when applicable.
 2. **Input Dataset:** Full item table with costs, scores, score/cost ratios, and selection status.
 3. **Optimal Recommendation:** Recommended strategy, maximum score, expenditure, remaining budget, optimality status, and recommended item table (mathematically verified so expenditure equals sum of selected item costs $\le$ budget and score equals sum of selected item scores).
-4. **Algorithm Performance:** FIFO vs. LC execution time, generated/explored/pruned/frontier nodes, max queue size, node-limit note, and optional multi-size scaling benchmark summary with explicit dataset source and seed labeling.
+4. **Algorithm Performance:** FIFO vs. LC execution time, generated/explored/pruned/frontier nodes, max queue size, node-limit & pruning note (distinguishing bound-pruned vs. infeasible-pruned nodes), and multi-size scaling benchmark summary using the shared benchmark configuration (`5, 10, 15, 20, 24` items) with explicit dataset source, seed, and custom expansion labeling.
 5. **Independent Dynamic Programming Verification:** DP baseline score, states explored, tri-method consensus, and execution-limit warnings when capped.
 6. **Budget Sensitivity / What-If Analysis:** Embedded vector sensitivity curve (labeled with the dataset name and item count), stepwise budget table, and automated insights.
-7. **Conclusion:** Data-driven summary comparing FIFO, LC, and DP on the current run.
+7. **Conclusion:** Data-driven summary with accurate pruning breakdown reporting total pruned nodes, bound-pruned nodes, and infeasible nodes.
 
 ## 19. CSV Benchmark Export
 The **Benchmark CSV Export** (`POST /api/report/csv` and the **Export CSV** controls on `/performance` and `/reports`) exports multi-size FIFO and LC benchmark metrics (`budgetadvisor_<mode>_benchmark.csv`) with 24 columns:
 `Dataset Size`, `Mode`, `Budget (INR)`, `Algorithm`, `Execution Time Median (ms)`, `Execution Time Min (ms)`, `Execution Time Max (ms)`, `Nodes Generated`, `Nodes Explored`, `Nodes Pruned`, `Bound Pruned`, `Infeasible Pruned`, `Max Queue Size`, `Optimal Value`, `Selected Cost (INR)`, `Remaining Budget (INR)`, `Proven Optimal`, `Stop Reason`, `DP Optimal Value`, `Matches DP`, `Verification Status`, `Dataset Name`, `Dataset Source`, and `Seed`.
-On `/reports`, users can select a shared benchmark configuration (`custom` vs. `generated` dataset source and `seed`) so PDF and CSV exports can either share the exact same dataset configuration or clearly label their distinct configurations.
+On `/reports`, both PDF and CSV exports use a shared benchmark-size configuration (`5, 10, 15, 20, 24` items) and share the selected dataset context (`custom` vs. `generated` dataset source and `seed`), while execution times are naturally recorded as separate empirical measurement runs.
 
 ## 20. Technology Stack
 - **Backend:** Python 3.10+, FastAPI, Uvicorn, Pydantic (v1 & v2 compatibility layer), Motor (AsyncIO MongoDB driver) with automatic `mongomock_motor` and built-in `_InMemoryClient` fallback, `fractions.Fraction`, `collections.deque`, `heapq`, and custom PDF 1.4 vector report generator.
@@ -318,10 +326,12 @@ We distinguish five memory quantities in the actual implementation:
 
 ## 30. Four-Member Workload Distribution
 
-- **Kris Rodrigues** — Project Lead & Systems Architect (FIFO Branch and Bound Lead)
-- **Krisha Shet** — Algorithm & Baseline Verification Engineer (LC B&B & Sparse DP)
-- **Megha Gobre** — Backend Infrastructure & Analytical Engines Engineer
-- **Jeolita Parpatekar** — Frontend & UI/UX Visualization Engineer
+> **Team Member Information & Submission Note (Group G12):** The four-member workload distribution below reflects the assigned members and the four core module boundaries (FIFO Algorithm Development, LC and Verification, Backend Development, and Frontend Development). If any member details or institution requirements change prior to final submission, update this section accordingly.
+
+- **Member 1 (FIFO Algorithm Core & Project Lead):** **Kris Rodrigues** — Project Lead & Systems Architect
+- **Member 2 (LC & Baseline Verification):** **Krisha Shet** — Algorithm & Baseline Verification Engineer
+- **Member 3 (Backend Development):** **Megha Gobre** — Backend Infrastructure & Analytical Engines Engineer
+- **Member 4 (Frontend Development):** **Jeolita Parpatekar** — Frontend & UI/UX Visualization Engineer
 
 ### Assigned Roles & Responsibilities
 

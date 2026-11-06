@@ -192,6 +192,12 @@ export default function PerformanceAnalysis({ workspace: w }: { workspace: Works
                 Current Custom Dataset ({w.data?.items.length || 0} items)
               </button>
             </div>
+            {datasetSource === 'custom' && (
+              <p className="field-hint" data-testid="custom-expansion-notice" style={{ marginTop: 8, fontSize: '0.82rem', color: '#64748b', lineHeight: 1.45 }}>
+                <Info size={13} style={{ display: 'inline', verticalAlign: 'text-bottom', marginRight: 4 }} />
+                <strong>Custom Dataset Scalability Note:</strong> Datasets exceeding the original custom item count ({w.data?.items.length || 0} items) are expanded using reproducible variations derived from the original dataset. These additional entries are generated for algorithm scalability testing and are not independently entered real-world products. (Original dataset: {w.data?.items.length || 0} items · Variations used for benchmark sizes &gt; {w.data?.items.length || 0}).
+              </p>
+            )}
           </div>
 
           <div className="control-group">

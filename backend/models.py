@@ -434,7 +434,7 @@ class ReportExportRequest(CompatModel):
     sensitivity_intervals: int = Field(default=6, ge=2, le=15)
     include_benchmark: bool = False
     benchmark_dataset_source: Optional[Literal['custom', 'generated']] = None
-    benchmark_sizes: list[int] = Field(default_factory=lambda: [5, 10, 15, 20])
+    benchmark_sizes: list[int] = Field(default_factory=lambda: [5, 10, 15, 20, 24])
     benchmark_repetitions: int = Field(default=3, ge=1, le=7)
     benchmark_seed: int = Field(default=42, ge=1, le=999_999)
 

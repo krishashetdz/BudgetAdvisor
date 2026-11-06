@@ -456,13 +456,14 @@ def test_pdf_report_with_benchmark_table_and_empty_dataset(api_client):
 
 
 def test_pdf_and_csv_dataset_consistency_and_mathematical_verification():
-    """Verify Issue 6 & 7: PDF and CSV exports using the same benchmark configuration produce matching
-    deterministic node counts and optimal values, and clearly distinguish custom vs generated sources."""
+    """Verify Issue 1, 2, 3: PDF and CSV exports using the shared benchmark configuration ([5, 10, 15, 20, 24])
+    produce matching deterministic node counts and optimal values, clearly document custom dataset expansions,
+    and accurately break down bound-pruned vs. infeasible-pruned nodes in the PDF conclusion."""
     shopping = next(s for s in SAMPLES if s["mode"] == "shopping")
     items = shopping["items"]
     budget = Decimal(shopping["budget"])
 
-    # 1. Export PDF and CSV using the exact same Custom dataset configuration (sizes [5, 10, 15, 20], seed=42)
+    # 1. Export PDF and CSV using the shared benchmark configuration (sizes [5, 10, 15, 20, 24], seed=42)
     pdf_req = ReportExportRequest(
         dataset_name="Shopping Advisor Dataset",
         run_id="g12-consistency-check",
@@ -474,7 +475,7 @@ def test_pdf_and_csv_dataset_consistency_and_mathematical_verification():
         sensitivity_intervals=6,
         include_benchmark=True,
         benchmark_dataset_source="custom",
-        benchmark_sizes=[5, 10, 15, 20],
+        benchmark_sizes=[5, 10, 15, 20, 24],
         benchmark_repetitions=2,
         benchmark_seed=42,
     )
@@ -484,12 +485,19 @@ def test_pdf_and_csv_dataset_consistency_and_mathematical_verification():
     pdf_text = "\n".join(p.extract_text() or "" for p in reader.pages)
     assert "Source: Custom [Shopping Advisor Dataset]" in pdf_text
     assert "Seed 42" in pdf_text
+    assert "Note on Custom Datasets:" in pdf_text
+    assert "reproducible variations derived from the original dataset" in pdf_text
+
+    # Verify Issue 1: Correct pruning terminology with separate bound-pruned and infeasible counts
+    assert "bound-pruned nodes" in pdf_text
+    assert "infeasible nodes" in pdf_text
+    assert "via the fractional-knapsack upper bound" not in pdf_text
 
     csv_req = BenchmarkRequest(
         dataset_name="Shopping Advisor Dataset",
         mode="shopping",
         dataset_source="custom",
-        sizes=[5, 10, 15, 20],
+        sizes=[5, 10, 15, 20, 24],
         repetitions=2,
         seed=42,
         budget=budget,
@@ -498,7 +506,7 @@ def test_pdf_and_csv_dataset_consistency_and_mathematical_verification():
     bench_res = run_benchmark_suite(csv_req)
     csv_text = generate_benchmark_csv(bench_res)
     parsed_csv = list(csv.reader(io.StringIO(csv_text)))
-    assert len(parsed_csv) == 1 + 4 * 2
+    assert len(parsed_csv) == 1 + 5 * 2
 
     # Every row in the CSV must appear with matching deterministic node counts & optimal value in the PDF
     for brow in bench_res.rows:

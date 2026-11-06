@@ -209,14 +209,14 @@ class AcademicPDFBuilder:
         self.y -= total_h + 2
 
     def add_table(self, headers: list[str], rows: list[list[str]], col_Editable_fractions: list[float]):
-        row_h = 16.5
-        header_h = 18.5
-        total_table_h = header_h + len(rows) * row_h + 6.0
+        row_h = 14.2 if len(rows) > 7 else 16.0
+        header_h = 17.0
+        total_table_h = header_h + len(rows) * row_h + 5.0
         # Keep compact tables intact on a single page if they would split near a page boundary
         if total_table_h <= 210.0 and (self.y - total_table_h < self.MARGIN_BOTTOM):
             self.new_page()
         else:
-            self.ensure_space(header_h + row_h * min(2, max(1, len(rows))) + 6.0)
+            self.ensure_space(header_h + row_h * min(2, max(1, len(rows))) + 5.0)
 
         col_widths = [f * self.content_w for f in col_Editable_fractions]
 
@@ -232,7 +232,7 @@ class AcademicPDFBuilder:
             )
             cx = self.MARGIN_X
             for h_text, cw in zip(headers, col_widths):
-                self.draw_text(cx + 5, y_box + 5.5, h_text, font='F2', size=7.8, rgb=(0.20, 0.28, 0.25))
+                self.draw_text(cx + 4, y_box + 4.8, h_text, font='F2', size=7.5, rgb=(0.20, 0.28, 0.25))
                 cx += cw
             self.y = y_box
 
@@ -257,16 +257,16 @@ class AcademicPDFBuilder:
                 cell_str = str(cell)
                 if len(cell_str) > max_c:
                     cell_str = cell_str[: max_c - 1] + '.'
-                self.draw_text(cx + 5, y_box + 5.0, cell_str, font='F1', size=8.0, rgb=(0.16, 0.20, 0.19))
+                self.draw_text(cx + 4, y_box + 4.2, cell_str, font='F1', size=7.7, rgb=(0.16, 0.20, 0.19))
                 cx += cw
             self.y = y_box
-        self.y -= 5
+        self.y -= 4
 
     def add_sensitivity_chart(self, points: list[SensitivityPoint], dataset_label: str = ''):
         if not points:
             return
-        chart_h = 124.0
-        self.ensure_space(chart_h + 15.0)
+        chart_h = 104.0
+        self.ensure_space(chart_h + 12.0)
         box_y = self.y - chart_h
         self.draw_rect(
             self.MARGIN_X,
@@ -283,17 +283,17 @@ class AcademicPDFBuilder:
         )
         self.draw_text(
             self.MARGIN_X + 12,
-            self.y - 14,
+            self.y - 13,
             chart_title,
             font='F2',
-            size=8.1,
+            size=7.9,
             rgb=(0.18, 0.36, 0.32),
         )
 
-        plot_x = self.MARGIN_X + 50
-        plot_y = box_y + 22
-        plot_w = self.content_w - 70
-        plot_h = chart_h - 44
+        plot_x = self.MARGIN_X + 48
+        plot_y = box_y + 19
+        plot_w = self.content_w - 66
+        plot_h = chart_h - 38
 
         # Draw axes
         self.draw_line(plot_x, plot_y, plot_x + plot_w, plot_y, rgb=(0.55, 0.60, 0.58), line_w=0.8)
@@ -537,8 +537,9 @@ def generate_optimization_pdf_report(req: ReportExportRequest) -> bytes:
         col_Editable_fractions=[0.21, 0.10, 0.09, 0.09, 0.08, 0.08, 0.10, 0.10, 0.15],
     )
     pdf.add_paragraph(
-        f'Node-Limit Note: Configured search limit caps explored (visited) nodes at {req.max_nodes:,} '
-        f'({req.time_limit_ms:,} ms timeout). Because each expanded node generates 2 children, '
+        f'Node-Limit & Pruning Note: Configured search limit caps explored (visited) nodes at {req.max_nodes:,} '
+        f'({req.time_limit_ms:,} ms timeout). Pruned nodes represent the sum of upper-bound pruned nodes (node.bound < best_score) '
+        f'and infeasible budget-pruned nodes (node.cost > budget). Because each expanded node generates 2 children, '
         'generated nodes (1 + 2*expanded = explored + frontier) can exceed explored nodes when a search is capped.'
     )
 
@@ -576,8 +577,11 @@ def generate_optimization_pdf_report(req: ReportExportRequest) -> bytes:
                     f'{m.max_queue_size:,}',
                     f'{m.optimal_value:,.2f}',
                 ])
+        base_item_cnt = len(req.items)
+        has_expanded = b_source == 'custom' and any(brow.dataset_size > base_item_cnt for brow in bench_res.rows)
+        max_size = max((brow.dataset_size for brow in bench_res.rows), default=0)
         src_desc = (
-            f'Source: Custom [{req.dataset_name}], Budget Rs. {float(req.budget):,.0f}, Seed {req.benchmark_seed}'
+            f'Source: Custom [{req.dataset_name}], Base {base_item_cnt} items, Expanded to {max_size} items, Variations: {"Yes" if has_expanded else "No"}, Budget Rs. {float(req.budget):,.0f}, Seed {req.benchmark_seed}'
             if b_source == 'custom'
             else f'Source: Generated Pool [{req.mode.title()}], Seed {req.benchmark_seed}'
         )
@@ -593,6 +597,12 @@ def generate_optimization_pdf_report(req: ReportExportRequest) -> bytes:
             rows=bench_rows,
             col_Editable_fractions=[0.11, 0.10, 0.14, 0.13, 0.13, 0.13, 0.13, 0.13],
         )
+        if has_expanded:
+            pdf.add_paragraph(
+                'Note on Custom Datasets: Datasets exceeding the original custom item count are expanded using '
+                'reproducible variations derived from the original dataset. These additional entries are generated '
+                'for algorithm scalability testing and are not independently entered real-world products.'
+            )
 
     # Section 5: Verification
     pdf.add_section_heading('5', 'Independent Dynamic Programming Verification', min_following_space=62.0)
@@ -622,7 +632,7 @@ def generate_optimization_pdf_report(req: ReportExportRequest) -> bytes:
             )
 
     # Section 6: Budget Sensitivity Analysis
-    pdf.add_section_heading('6', 'Budget Sensitivity / What-If Analysis', min_following_space=145.0)
+    pdf.add_section_heading('6', 'Budget Sensitivity / What-If Analysis', min_following_space=120.0)
     if req.include_sensitivity and len(req.items) > 0:
         base_b = float(req.budget)
         min_b = req.sensitivity_min_budget if req.sensitivity_min_budget is not None else Decimal(str(round(max(0.0, base_b * 0.25), 2)))
@@ -658,7 +668,7 @@ def generate_optimization_pdf_report(req: ReportExportRequest) -> bytes:
             rows=sens_rows,
             col_Editable_fractions=[0.17, 0.15, 0.17, 0.16, 0.11, 0.12, 0.12],
         )
-        for ins in sens_res.insights[:3]:
+        for ins in sens_res.insights[:2]:
             pdf.add_paragraph(f'- {ins.title}: {ins.description}')
     else:
         pdf.add_paragraph('Budget sensitivity analysis was not requested or the input dataset is empty.')
@@ -666,19 +676,42 @@ def generate_optimization_pdf_report(req: ReportExportRequest) -> bytes:
     # Section 7: Conclusion
     pdf.add_section_heading('7', 'Conclusion', min_following_space=48.0)
     node_diff = run.fifo.visited - run.lc.visited
+
+    # Extract genuine individual pruning counters if available from solver
+    lc_bound = getattr(run.lc, 'bound_pruned', None)
+    lc_infeas = getattr(run.lc, 'infeasible_pruned', None)
+    if lc_bound is not None and lc_infeas is not None:
+        lc_pruning_clause = (
+            f'pruned {run.lc.pruned:,} nodes in total, including {lc_bound:,} bound-pruned nodes '
+            f'and {lc_infeas:,} infeasible nodes'
+        )
+    else:
+        lc_pruning_clause = f'pruned {run.lc.pruned:,} nodes in total'
+
+    fifo_bound = getattr(run.fifo, 'bound_pruned', None)
+    fifo_infeas = getattr(run.fifo, 'infeasible_pruned', None)
+    if fifo_bound is not None and fifo_infeas is not None:
+        fifo_pruning_clause = (
+            f'pruned {run.fifo.pruned:,} nodes in total, including {fifo_bound:,} bound-pruned nodes '
+            f'and {fifo_infeas:,} infeasible nodes'
+        )
+    else:
+        fifo_pruning_clause = f'pruned {run.fifo.pruned:,} nodes in total'
+
     if node_diff > 0:
         eff_sentence = (
-            f'LC Branch and Bound explored {run.lc.visited:,} nodes compared to {run.fifo.visited:,} nodes '
-            f'for FIFO Branch and Bound, pruning {run.lc.pruned:,} branches via the fractional-knapsack upper bound.'
+            f'LC Branch and Bound explored {run.lc.visited:,} nodes and {lc_pruning_clause}, '
+            f'compared to {run.fifo.visited:,} explored nodes for FIFO Branch and Bound.'
         )
     elif node_diff < 0:
         eff_sentence = (
-            f'On this instance, FIFO Branch and Bound visited {run.fifo.visited:,} nodes while LC visited '
-            f'{run.lc.visited:,} nodes, illustrating that best-first ordering is not guaranteed to visit fewer nodes on every input.'
+            f'On this instance, FIFO Branch and Bound visited {run.fifo.visited:,} nodes ({fifo_pruning_clause}) while LC visited '
+            f'{run.lc.visited:,} nodes ({lc_pruning_clause}), illustrating that best-first ordering is not guaranteed to visit fewer nodes on every input.'
         )
     else:
         eff_sentence = (
-            f'Both FIFO and LC Branch and Bound explored exactly {run.lc.visited:,} nodes on this dataset.'
+            f'Both FIFO and LC Branch and Bound explored exactly {run.lc.visited:,} nodes on this dataset '
+            f'(LC {lc_pruning_clause}).'
         )
 
     ver_sentence = (

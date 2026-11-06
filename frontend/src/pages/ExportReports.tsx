@@ -20,6 +20,9 @@ import {
 import { Workspace } from '../hooks/useWorkspace';
 import { money, number } from '../types';
 
+const SHARED_BENCHMARK_SIZES = [5, 10, 15, 20, 24];
+const SHARED_BENCHMARK_REPETITIONS = 3;
+
 export default function ExportReports({ workspace: w }: { workspace: Workspace }) {
   const [datasetName, setDatasetName] = useState<string>(
     w.mode === 'shopping' ? 'Shopping Advisor Dataset' : 'Investment Portfolio Dataset'
@@ -54,8 +57,8 @@ export default function ExportReports({ workspace: w }: { workspace: Workspace }
         sensitivity_intervals: sensitivityIntervals,
         include_benchmark: includeBenchmark,
         benchmark_dataset_source: benchmarkSource,
-        benchmark_sizes: [5, 10, 15, 20],
-        benchmark_repetitions: 3,
+        benchmark_sizes: SHARED_BENCHMARK_SIZES,
+        benchmark_repetitions: SHARED_BENCHMARK_REPETITIONS,
         benchmark_seed: benchmarkSeed,
       });
       triggerBrowserDownload(blob, `budgetadvisor_${w.mode}_report.pdf`);
@@ -81,8 +84,8 @@ export default function ExportReports({ workspace: w }: { workspace: Workspace }
           : `Generated ${w.mode.charAt(0).toUpperCase() + w.mode.slice(1)} Benchmark Pool (Seed ${benchmarkSeed})`,
         mode: w.mode,
         dataset_source: useCustom ? 'custom' : 'generated',
-        sizes: [5, 10, 15, 20, 24],
-        repetitions: 3,
+        sizes: SHARED_BENCHMARK_SIZES,
+        repetitions: SHARED_BENCHMARK_REPETITIONS,
         seed: benchmarkSeed,
         budget: useCustom && w.data ? w.data.budget : undefined,
         custom_items: useCustom && w.data ? w.data.items : undefined,
@@ -222,7 +225,7 @@ export default function ExportReports({ workspace: w }: { workspace: Workspace }
                   checked={includeBenchmark}
                   onChange={e => setIncludeBenchmark(e.target.checked)}
                 />
-                <span>Include Multi-Size Scaling Benchmark Table (5–20 items) in Section 4</span>
+                <span>Include Multi-Size Scaling Benchmark Table (5–24 items) in Section 4</span>
               </label>
             </div>
           </div>
@@ -280,6 +283,11 @@ export default function ExportReports({ workspace: w }: { workspace: Workspace }
                 <option value="generated">Generated Benchmark Pool (Seeded, 45% Positive-Cost Budget per Size)</option>
                 <option value="custom">Current Custom Workspace Dataset ({w.data?.items.length || 0} Base Items, Fixed Budget {money(Number(w.data?.budget || 0))})</option>
               </select>
+              {benchmarkSource === 'custom' && (
+                <p className="field-hint" style={{ marginTop: 6, fontSize: '0.8rem', color: '#64748b' }}>
+                  <strong>Custom Dataset Scalability Note:</strong> Datasets exceeding the original custom item count ({w.data?.items.length || 0} items) are expanded using reproducible variations derived from the original dataset. These additional entries are generated for algorithm scalability testing and are not independently entered real-world products.
+                </p>
+              )}
             </div>
 
             <div className="control-group">

@@ -1,0 +1,761 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [5 0 R 7 0 R] /Count 2 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>
+endobj
+5 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 6 0 R >>
+endobj
+6 0 obj
+<< /Length 14757 >>
+stream
+q
+0.60 w
+0.180 0.380 0.340 rg
+40.00 743.89 515.28 60.00 re f
+Q
+q BT /F2 7.40 Tf 0.800 0.910 0.880 rg 54.00 789.89 Td (GROUP ID: G12  |  DESIGN & ANALYSIS OF ALGORITHMS) Tj ET Q
+q BT /F1 7.60 Tf 0.900 0.960 0.930 rg 395.08 789.89 Td (Generated: 2026-11-06 02:58:41 UTC) Tj ET Q
+q BT /F2 13.20 Tf 1.000 1.000 1.000 rg 54.00 769.89 Td (BudgetAdvisor \(Group G12\) - Optimization & DAA Report) Tj ET Q
+q BT /F1 8.50 Tf 0.880 0.940 0.910 rg 54.00 753.89 Td (0/1 Knapsack Problem: FIFO Branch & Bound, LC Branch & Bound, and DP Verification) Tj ET Q
+q BT /F2 7.20 Tf 0.260 0.480 0.440 rg 40.00 722.89 Td (SECTION 1) Tj ET Q
+q BT /F2 11.40 Tf 0.140 0.180 0.180 rg 40.00 710.89 Td (Project and Optimization Details) Tj ET Q
+q 0.90 w 0.260 0.480 0.440 RG 40.00 706.89 m 555.28 706.89 l S Q
+q
+0.60 w
+0.960 0.980 0.970 rg
+0.860 0.890 0.880 RG
+42.00 679.89 167.76 22.00 re B
+Q
+q BT /F1 6.80 Tf 0.420 0.470 0.450 rg 48.00 692.89 Td (APPLICATION & GROUP) Tj ET Q
+q BT /F2 8.30 Tf 0.140 0.180 0.180 rg 48.00 682.89 Td (BudgetAdvisor \(Group G12\)) Tj ET Q
+q
+0.60 w
+0.960 0.980 0.970 rg
+0.860 0.890 0.880 RG
+213.76 679.89 167.76 22.00 re B
+Q
+q BT /F1 6.80 Tf 0.420 0.470 0.450 rg 219.76 692.89 Td (SELECTED MODE) Tj ET Q
+q BT /F2 9.10 Tf 0.140 0.180 0.180 rg 219.76 682.89 Td (Investment Advisor) Tj ET Q
+q
+0.60 w
+0.960 0.980 0.970 rg
+0.860 0.890 0.880 RG
+385.52 679.89 167.76 22.00 re B
+Q
+q BT /F1 6.80 Tf 0.420 0.470 0.450 rg 391.52 692.89 Td (DATASET NAME) Tj ET Q
+q BT /F2 8.30 Tf 0.140 0.180 0.180 rg 391.52 682.89 Td (Investment Portfolio Dataset) Tj ET Q
+q
+0.60 w
+0.960 0.980 0.970 rg
+0.860 0.890 0.880 RG
+42.00 653.89 167.76 22.00 re B
+Q
+q BT /F1 6.80 Tf 0.420 0.470 0.450 rg 48.00 666.89 Td (AVAILABLE BUDGET) Tj ET Q
+q BT /F2 9.10 Tf 0.140 0.180 0.180 rg 48.00 656.89 Td (Rs. 10,000.00) Tj ET Q
+q
+0.60 w
+0.960 0.980 0.970 rg
+0.860 0.890 0.880 RG
+213.76 653.89 167.76 22.00 re B
+Q
+q BT /F1 6.80 Tf 0.420 0.470 0.450 rg 219.76 666.89 Td (DATASET SOURCE & SIZE) Tj ET Q
+q BT /F2 9.10 Tf 0.140 0.180 0.180 rg 219.76 656.89 Td (Custom \(8 of 24 max\)) Tj ET Q
+q
+0.60 w
+0.960 0.980 0.970 rg
+0.860 0.890 0.880 RG
+385.52 653.89 167.76 22.00 re B
+Q
+q BT /F1 6.80 Tf 0.420 0.470 0.450 rg 391.52 666.89 Td (RUN ID & TIMESTAMP) Tj ET Q
+q BT /F2 7.50 Tf 0.140 0.180 0.180 rg 391.52 656.89 Td (run-audit- | 2026-11-06 02:58:41 UTC) Tj ET Q
+q BT /F1 8.90 Tf 0.200 0.240 0.230 rg 40.00 635.99 Td (Disclaimer: Investment mode uses an educational additive score model on fictional assets. Scores are) Tj ET Q
+q BT /F1 8.90 Tf 0.200 0.240 0.230 rg 40.00 623.89 Td (not financial returns or investment advice.) Tj ET Q
+q BT /F2 7.20 Tf 0.260 0.480 0.440 rg 40.00 607.18 Td (SECTION 2) Tj ET Q
+q BT /F2 11.40 Tf 0.140 0.180 0.180 rg 40.00 595.18 Td (Input Dataset \(8 Items - Investment Portfolio Dataset\)) Tj ET Q
+q 0.90 w 0.260 0.480 0.440 RG 40.00 591.18 m 555.28 591.18 l S Q
+q
+0.60 w
+0.910 0.940 0.920 rg
+0.780 0.830 0.800 RG
+40.00 570.18 515.28 17.00 re B
+Q
+q BT /F2 7.50 Tf 0.200 0.280 0.250 rg 44.00 574.98 Td (#) Tj ET Q
+q BT /F2 7.50 Tf 0.200 0.280 0.250 rg 74.92 574.98 Td (Item / Asset Name) Tj ET Q
+q BT /F2 7.50 Tf 0.200 0.280 0.250 rg 260.42 574.98 Td (Cost \(INR\)) Tj ET Q
+q BT /F2 7.50 Tf 0.200 0.280 0.250 rg 342.86 574.98 Td (Value / Score) Tj ET Q
+q BT /F2 7.50 Tf 0.200 0.280 0.250 rg 415.00 574.98 Td (Score/Cost) Tj ET Q
+q BT /F2 7.50 Tf 0.200 0.280 0.250 rg 481.99 574.98 Td (Status) Tj ET Q
+q
+0.60 w
+1.000 1.000 1.000 rg
+0.880 0.910 0.890 RG
+40.00 555.98 515.28 14.20 re B
+Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 44.00 560.18 Td (1) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 74.92 560.18 Td (Atlas index fund) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 260.42 560.18 Td (Rs. 4,000.00) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 342.86 560.18 Td (12.50) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 415.00 560.18 Td (0.0031) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 481.99 560.18 Td (Excluded) Tj ET Q
+q
+0.60 w
+0.985 0.992 0.988 rg
+0.880 0.910 0.890 RG
+40.00 541.78 515.28 14.20 re B
+Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 44.00 545.98 Td (2) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 74.92 545.98 Td (Cedar green energy) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 260.42 545.98 Td (Rs. 2,500.00) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 342.86 545.98 Td (16.00) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 415.00 545.98 Td (0.0064) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 481.99 545.98 Td (Selected) Tj ET Q
+q
+0.60 w
+1.000 1.000 1.000 rg
+0.880 0.910 0.890 RG
+40.00 527.58 515.28 14.20 re B
+Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 44.00 531.78 Td (3) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 74.92 531.78 Td (Meridian technology) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 260.42 531.78 Td (Rs. 3,500.00) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 342.86 531.78 Td (18.00) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 415.00 531.78 Td (0.0051) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 481.99 531.78 Td (Selected) Tj ET Q
+q
+0.60 w
+0.985 0.992 0.988 rg
+0.880 0.910 0.890 RG
+40.00 513.38 515.28 14.20 re B
+Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 44.00 517.58 Td (4) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 74.92 517.58 Td (Harbor bond fund) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 260.42 517.58 Td (Rs. 2,000.00) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 342.86 517.58 Td (7.50) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 415.00 517.58 Td (0.0037) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 481.99 517.58 Td (Excluded) Tj ET Q
+q
+0.60 w
+1.000 1.000 1.000 rg
+0.880 0.910 0.890 RG
+40.00 499.18 515.28 14.20 re B
+Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 44.00 503.38 Td (5) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 74.92 503.38 Td (Orion healthcare) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 260.42 503.38 Td (Rs. 3,000.00) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 342.86 503.38 Td (14.00) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 415.00 503.38 Td (0.0047) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 481.99 503.38 Td (Excluded) Tj ET Q
+q
+0.60 w
+0.985 0.992 0.988 rg
+0.880 0.910 0.890 RG
+40.00 484.98 515.28 14.20 re B
+Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 44.00 489.18 Td (6) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 74.92 489.18 Td (Maple consumer fund) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 260.42 489.18 Td (Rs. 1,500.00) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 342.86 489.18 Td (9.00) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 415.00 489.18 Td (0.0060) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 481.99 489.18 Td (Selected) Tj ET Q
+q
+0.60 w
+1.000 1.000 1.000 rg
+0.880 0.910 0.890 RG
+40.00 470.78 515.28 14.20 re B
+Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 44.00 474.98 Td (7) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 74.92 474.98 Td (Summit infrastructure) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 260.42 474.98 Td (Rs. 4,500.00) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 342.86 474.98 Td (17.00) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 415.00 474.98 Td (0.0038) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 481.99 474.98 Td (Excluded) Tj ET Q
+q
+0.60 w
+0.985 0.992 0.988 rg
+0.880 0.910 0.890 RG
+40.00 456.58 515.28 14.20 re B
+Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 44.00 460.78 Td (8) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 74.92 460.78 Td (Willow small-cap fund) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 260.42 460.78 Td (Rs. 2,200.00) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 342.86 460.78 Td (15.50) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 415.00 460.78 Td (0.0070) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 481.99 460.78 Td (Selected) Tj ET Q
+q BT /F2 7.20 Tf 0.260 0.480 0.440 rg 40.00 441.58 Td (SECTION 3) Tj ET Q
+q BT /F2 11.40 Tf 0.140 0.180 0.180 rg 40.00 429.58 Td (Optimal Recommendation) Tj ET Q
+q 0.90 w 0.260 0.480 0.440 RG 40.00 425.58 m 555.28 425.58 l S Q
+q
+0.60 w
+0.960 0.980 0.970 rg
+0.860 0.890 0.880 RG
+42.00 398.58 167.76 22.00 re B
+Q
+q BT /F1 6.80 Tf 0.420 0.470 0.450 rg 48.00 411.58 Td (RECOMMENDED STRATEGY) Tj ET Q
+q BT /F2 9.10 Tf 0.140 0.180 0.180 rg 48.00 401.58 Td (FIFO Branch & Bound) Tj ET Q
+q
+0.60 w
+0.960 0.980 0.970 rg
+0.860 0.890 0.880 RG
+213.76 398.58 167.76 22.00 re B
+Q
+q BT /F1 6.80 Tf 0.420 0.470 0.450 rg 219.76 411.58 Td (MAXIMUM ACHIEVABLE SCORE) Tj ET Q
+q BT /F2 9.10 Tf 0.140 0.180 0.180 rg 219.76 401.58 Td (58.50 pts) Tj ET Q
+q
+0.60 w
+0.960 0.980 0.970 rg
+0.860 0.890 0.880 RG
+385.52 398.58 167.76 22.00 re B
+Q
+q BT /F1 6.80 Tf 0.420 0.470 0.450 rg 391.52 411.58 Td (TOTAL EXPENDITURE) Tj ET Q
+q BT /F2 9.10 Tf 0.140 0.180 0.180 rg 391.52 401.58 Td (Rs. 9,700.00) Tj ET Q
+q
+0.60 w
+0.960 0.980 0.970 rg
+0.860 0.890 0.880 RG
+42.00 372.58 167.76 22.00 re B
+Q
+q BT /F1 6.80 Tf 0.420 0.470 0.450 rg 48.00 385.58 Td (REMAINING BUDGET) Tj ET Q
+q BT /F2 9.10 Tf 0.140 0.180 0.180 rg 48.00 375.58 Td (Rs. 300.00) Tj ET Q
+q
+0.60 w
+0.960 0.980 0.970 rg
+0.860 0.890 0.880 RG
+213.76 372.58 167.76 22.00 re B
+Q
+q BT /F1 6.80 Tf 0.420 0.470 0.450 rg 219.76 385.58 Td (SELECTED ITEMS COUNT) Tj ET Q
+q BT /F2 9.10 Tf 0.140 0.180 0.180 rg 219.76 375.58 Td (4 items) Tj ET Q
+q
+0.60 w
+0.960 0.980 0.970 rg
+0.860 0.890 0.880 RG
+385.52 372.58 167.76 22.00 re B
+Q
+q BT /F1 6.80 Tf 0.420 0.470 0.450 rg 391.52 385.58 Td (OPTIMALITY STATUS) Tj ET Q
+q BT /F2 9.10 Tf 0.140 0.180 0.180 rg 391.52 375.58 Td (Proven Optimal) Tj ET Q
+q
+0.60 w
+0.910 0.940 0.920 rg
+0.780 0.830 0.800 RG
+40.00 346.58 515.28 17.00 re B
+Q
+q BT /F2 7.50 Tf 0.200 0.280 0.250 rg 44.00 351.38 Td (#) Tj ET Q
+q BT /F2 7.50 Tf 0.200 0.280 0.250 rg 85.22 351.38 Td (Recommended Item / Asset) Tj ET Q
+q BT /F2 7.50 Tf 0.200 0.280 0.250 rg 342.86 351.38 Td (Individual Cost) Tj ET Q
+q BT /F2 7.50 Tf 0.200 0.280 0.250 rg 456.22 351.38 Td (Individual Value) Tj ET Q
+q
+0.60 w
+1.000 1.000 1.000 rg
+0.880 0.910 0.890 RG
+40.00 330.58 515.28 16.00 re B
+Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 44.00 334.78 Td (1) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 85.22 334.78 Td (Cedar green energy) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 342.86 334.78 Td (Rs. 2,500.00) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 456.22 334.78 Td (16.00 pts) Tj ET Q
+q
+0.60 w
+0.985 0.992 0.988 rg
+0.880 0.910 0.890 RG
+40.00 314.58 515.28 16.00 re B
+Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 44.00 318.78 Td (2) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 85.22 318.78 Td (Meridian technology) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 342.86 318.78 Td (Rs. 3,500.00) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 456.22 318.78 Td (18.00 pts) Tj ET Q
+q
+0.60 w
+1.000 1.000 1.000 rg
+0.880 0.910 0.890 RG
+40.00 298.58 515.28 16.00 re B
+Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 44.00 302.78 Td (3) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 85.22 302.78 Td (Maple consumer fund) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 342.86 302.78 Td (Rs. 1,500.00) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 456.22 302.78 Td (9.00 pts) Tj ET Q
+q
+0.60 w
+0.985 0.992 0.988 rg
+0.880 0.910 0.890 RG
+40.00 282.58 515.28 16.00 re B
+Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 44.00 286.78 Td (4) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 85.22 286.78 Td (Willow small-cap fund) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 342.86 286.78 Td (Rs. 2,200.00) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 456.22 286.78 Td (15.50 pts) Tj ET Q
+q BT /F2 7.20 Tf 0.260 0.480 0.440 rg 40.00 267.58 Td (SECTION 4) Tj ET Q
+q BT /F2 11.40 Tf 0.140 0.180 0.180 rg 40.00 255.58 Td (Algorithm Performance \(FIFO vs. LC Branch and Bound\)) Tj ET Q
+q 0.90 w 0.260 0.480 0.440 RG 40.00 251.58 m 555.28 251.58 l S Q
+q
+0.60 w
+0.910 0.940 0.920 rg
+0.780 0.830 0.800 RG
+40.00 230.58 515.28 17.00 re B
+Q
+q BT /F2 7.50 Tf 0.200 0.280 0.250 rg 44.00 235.38 Td (Algorithm) Tj ET Q
+q BT /F2 7.50 Tf 0.200 0.280 0.250 rg 152.21 235.38 Td (Exec Time) Tj ET Q
+q BT /F2 7.50 Tf 0.200 0.280 0.250 rg 203.74 235.38 Td (Generated) Tj ET Q
+q BT /F2 7.50 Tf 0.200 0.280 0.250 rg 250.11 235.38 Td (Explored) Tj ET Q
+q BT /F2 7.50 Tf 0.200 0.280 0.250 rg 296.49 235.38 Td (Pruned) Tj ET Q
+q BT /F2 7.50 Tf 0.200 0.280 0.250 rg 337.71 235.38 Td (Frontier) Tj ET Q
+q BT /F2 7.50 Tf 0.200 0.280 0.250 rg 378.93 235.38 Td (Max Queue) Tj ET Q
+q BT /F2 7.50 Tf 0.200 0.280 0.250 rg 430.46 235.38 Td (Opt Val) Tj ET Q
+q BT /F2 7.50 Tf 0.200 0.280 0.250 rg 481.99 235.38 Td (Status) Tj ET Q
+q
+0.60 w
+1.000 1.000 1.000 rg
+0.880 0.910 0.890 RG
+40.00 214.58 515.28 16.00 re B
+Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 44.00 218.78 Td (FIFO Branch & Bound) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 152.21 218.78 Td (0.386 ms) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 203.74 218.78 Td (39) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 250.11 218.78 Td (39) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 296.49 218.78 Td (19) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 337.71 218.78 Td (0) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 378.93 218.78 Td (17) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 430.46 218.78 Td (58.50) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 481.99 218.78 Td (Proven Optimal) Tj ET Q
+q
+0.60 w
+0.985 0.992 0.988 rg
+0.880 0.910 0.890 RG
+40.00 198.58 515.28 16.00 re B
+Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 44.00 202.78 Td (LC Branch & Bound) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 152.21 202.78 Td (0.212 ms) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 203.74 202.78 Td (17) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 250.11 202.78 Td (17) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 296.49 202.78 Td (8) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 337.71 202.78 Td (0) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 378.93 202.78 Td (9) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 430.46 202.78 Td (58.50) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 481.99 202.78 Td (Proven Optimal) Tj ET Q
+q BT /F1 8.90 Tf 0.200 0.240 0.230 rg 40.00 185.68 Td (Node-Limit & Pruning Note: Configured search limit caps explored \(visited\) nodes at 50,000 \(1,500 ms) Tj ET Q
+q BT /F1 8.90 Tf 0.200 0.240 0.230 rg 40.00 173.58 Td (timeout\). Pruned nodes represent the sum of upper-bound pruned nodes \(node.bound < best_score\) and) Tj ET Q
+q BT /F1 8.90 Tf 0.200 0.240 0.230 rg 40.00 161.47 Td (infeasible budget-pruned nodes \(node.cost > budget\). Because each expanded node generates 2 children,) Tj ET Q
+q BT /F1 8.90 Tf 0.200 0.240 0.230 rg 40.00 149.37 Td (generated nodes \(1 + 2*expanded = explored + frontier\) can exceed explored nodes when a search is) Tj ET Q
+q BT /F1 8.90 Tf 0.200 0.240 0.230 rg 40.00 137.27 Td (capped.) Tj ET Q
+q 0.5 w 0.85 0.88 0.86 RG 40.00 30.00 m 555.28 30.00 l S Q
+q BT /F1 7.4 Tf 0.480 0.530 0.510 rg 40.00 20.00 Td (BudgetAdvisor \(Group G12\) - 0/1 Knapsack Optimization & Algorithm Analysis Report) Tj ET Q
+q BT /F2 7.4 Tf 0.480 0.530 0.510 rg 505.28 20.00 Td (Page 1 of 2) Tj ET Q
+endstream
+endobj
+7 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 8 0 R >>
+endobj
+8 0 obj
+<< /Length 18770 >>
+stream
+q BT /F2 8.30 Tf 0.200 0.240 0.230 rg 40.00 795.59 Td (Multi-Size Scaling Benchmark Summary \(Source: Custom [Investment Portfolio Dataset], Base 8 items, Expanded to 24) Tj ET Q
+q BT /F2 8.30 Tf 0.200 0.240 0.230 rg 40.00 784.30 Td (items, Variations: Yes, Budget Rs. 10,000, Seed 42\):) Tj ET Q
+q
+0.60 w
+0.910 0.940 0.920 rg
+0.780 0.830 0.800 RG
+40.00 761.81 515.28 17.00 re B
+Q
+q BT /F2 7.50 Tf 0.200 0.280 0.250 rg 44.00 766.61 Td (Size) Tj ET Q
+q BT /F2 7.50 Tf 0.200 0.280 0.250 rg 100.68 766.61 Td (Algo) Tj ET Q
+q BT /F2 7.50 Tf 0.200 0.280 0.250 rg 152.21 766.61 Td (Median Time) Tj ET Q
+q BT /F2 7.50 Tf 0.200 0.280 0.250 rg 224.35 766.61 Td (Generated) Tj ET Q
+q BT /F2 7.50 Tf 0.200 0.280 0.250 rg 291.33 766.61 Td (Explored) Tj ET Q
+q BT /F2 7.50 Tf 0.200 0.280 0.250 rg 358.32 766.61 Td (Pruned) Tj ET Q
+q BT /F2 7.50 Tf 0.200 0.280 0.250 rg 425.31 766.61 Td (Max Queue) Tj ET Q
+q BT /F2 7.50 Tf 0.200 0.280 0.250 rg 492.29 766.61 Td (Opt Val) Tj ET Q
+q
+0.60 w
+1.000 1.000 1.000 rg
+0.880 0.910 0.890 RG
+40.00 747.61 515.28 14.20 re B
+Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 44.00 751.81 Td (5 items) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 100.68 751.81 Td (FIFO) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 152.21 751.81 Td (0.158 ms) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 224.35 751.81 Td (19) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 291.33 751.81 Td (19) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 358.32 751.81 Td (9) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 425.31 751.81 Td (9) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 492.29 751.81 Td (48.00) Tj ET Q
+q
+0.60 w
+0.985 0.992 0.988 rg
+0.880 0.910 0.890 RG
+40.00 733.41 515.28 14.20 re B
+Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 44.00 737.61 Td (5 items) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 100.68 737.61 Td (LC) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 152.21 737.61 Td (0.100 ms) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 224.35 737.61 Td (11) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 291.33 737.61 Td (11) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 358.32 737.61 Td (5) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 425.31 737.61 Td (6) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 492.29 737.61 Td (48.00) Tj ET Q
+q
+0.60 w
+1.000 1.000 1.000 rg
+0.880 0.910 0.890 RG
+40.00 719.21 515.28 14.20 re B
+Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 44.00 723.41 Td (10 items) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 100.68 723.41 Td (FIFO) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 152.21 723.41 Td (0.349 ms) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 224.35 723.41 Td (63) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 291.33 723.41 Td (63) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 358.32 723.41 Td (31) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 425.31 723.41 Td (19) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 492.29 723.41 Td (61.00) Tj ET Q
+q
+0.60 w
+0.985 0.992 0.988 rg
+0.880 0.910 0.890 RG
+40.00 705.01 515.28 14.20 re B
+Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 44.00 709.21 Td (10 items) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 100.68 709.21 Td (LC) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 152.21 709.21 Td (0.269 ms) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 224.35 709.21 Td (39) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 291.33 709.21 Td (39) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 358.32 709.21 Td (19) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 425.31 709.21 Td (20) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 492.29 709.21 Td (61.00) Tj ET Q
+q
+0.60 w
+1.000 1.000 1.000 rg
+0.880 0.910 0.890 RG
+40.00 690.81 515.28 14.20 re B
+Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 44.00 695.01 Td (15 items) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 100.68 695.01 Td (FIFO) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 152.21 695.01 Td (0.517 ms) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 224.35 695.01 Td (131) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 291.33 695.01 Td (131) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 358.32 695.01 Td (65) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 425.31 695.01 Td (20) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 492.29 695.01 Td (66.50) Tj ET Q
+q
+0.60 w
+0.985 0.992 0.988 rg
+0.880 0.910 0.890 RG
+40.00 676.61 515.28 14.20 re B
+Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 44.00 680.81 Td (15 items) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 100.68 680.81 Td (LC) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 152.21 680.81 Td (0.487 ms) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 224.35 680.81 Td (101) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 291.33 680.81 Td (101) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 358.32 680.81 Td (50) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 425.31 680.81 Td (51) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 492.29 680.81 Td (66.50) Tj ET Q
+q
+0.60 w
+1.000 1.000 1.000 rg
+0.880 0.910 0.890 RG
+40.00 662.41 515.28 14.20 re B
+Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 44.00 666.61 Td (20 items) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 100.68 666.61 Td (FIFO) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 152.21 666.61 Td (0.550 ms) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 224.35 666.61 Td (141) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 291.33 666.61 Td (141) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 358.32 666.61 Td (70) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 425.31 666.61 Td (24) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 492.29 666.61 Td (69.00) Tj ET Q
+q
+0.60 w
+0.985 0.992 0.988 rg
+0.880 0.910 0.890 RG
+40.00 648.21 515.28 14.20 re B
+Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 44.00 652.41 Td (20 items) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 100.68 652.41 Td (LC) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 152.21 652.41 Td (0.530 ms) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 224.35 652.41 Td (111) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 291.33 652.41 Td (111) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 358.32 652.41 Td (55) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 425.31 652.41 Td (56) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 492.29 652.41 Td (69.00) Tj ET Q
+q
+0.60 w
+1.000 1.000 1.000 rg
+0.880 0.910 0.890 RG
+40.00 634.01 515.28 14.20 re B
+Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 44.00 638.21 Td (24 items) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 100.68 638.21 Td (FIFO) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 152.21 638.21 Td (0.640 ms) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 224.35 638.21 Td (159) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 291.33 638.21 Td (159) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 358.32 638.21 Td (79) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 425.31 638.21 Td (45) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 492.29 638.21 Td (72.50) Tj ET Q
+q
+0.60 w
+0.985 0.992 0.988 rg
+0.880 0.910 0.890 RG
+40.00 619.81 515.28 14.20 re B
+Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 44.00 624.01 Td (24 items) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 100.68 624.01 Td (LC) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 152.21 624.01 Td (0.359 ms) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 224.35 624.01 Td (49) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 291.33 624.01 Td (49) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 358.32 624.01 Td (24) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 425.31 624.01 Td (25) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 492.29 624.01 Td (72.50) Tj ET Q
+q BT /F1 8.90 Tf 0.200 0.240 0.230 rg 40.00 606.91 Td (Note on Custom Datasets: Datasets exceeding the original custom item count are expanded using) Tj ET Q
+q BT /F1 8.90 Tf 0.200 0.240 0.230 rg 40.00 594.81 Td (reproducible variations derived from the original dataset. These additional entries are generated for) Tj ET Q
+q BT /F1 8.90 Tf 0.200 0.240 0.230 rg 40.00 582.71 Td (algorithm scalability testing and are not independently entered real-world products.) Tj ET Q
+q BT /F2 7.20 Tf 0.260 0.480 0.440 rg 40.00 566.00 Td (SECTION 5) Tj ET Q
+q BT /F2 11.40 Tf 0.140 0.180 0.180 rg 40.00 554.00 Td (Independent Dynamic Programming Verification) Tj ET Q
+q 0.90 w 0.260 0.480 0.440 RG 40.00 550.00 m 555.28 550.00 l S Q
+q
+0.60 w
+0.960 0.980 0.970 rg
+0.860 0.890 0.880 RG
+42.00 523.00 167.76 22.00 re B
+Q
+q BT /F1 6.80 Tf 0.420 0.470 0.450 rg 48.00 536.00 Td (DP BASELINE SCORE) Tj ET Q
+q BT /F2 8.30 Tf 0.140 0.180 0.180 rg 48.00 526.00 Td (58.50 pts \(Rs. 9,700.00\)) Tj ET Q
+q
+0.60 w
+0.960 0.980 0.970 rg
+0.860 0.890 0.880 RG
+213.76 523.00 167.76 22.00 re B
+Q
+q BT /F1 6.80 Tf 0.420 0.470 0.450 rg 219.76 536.00 Td (DP STATES EXPLORED) Tj ET Q
+q BT /F2 9.10 Tf 0.140 0.180 0.180 rg 219.76 526.00 Td (86 \(0.062 ms\)) Tj ET Q
+q
+0.60 w
+0.960 0.980 0.970 rg
+0.860 0.890 0.880 RG
+385.52 523.00 167.76 22.00 re B
+Q
+q BT /F1 6.80 Tf 0.420 0.470 0.450 rg 391.52 536.00 Td (DP COMPLETION STATUS) Tj ET Q
+q BT /F2 9.10 Tf 0.140 0.180 0.180 rg 391.52 526.00 Td (Proven Optimal) Tj ET Q
+q
+0.60 w
+0.960 0.980 0.970 rg
+0.860 0.890 0.880 RG
+42.00 497.00 167.76 22.00 re B
+Q
+q BT /F1 6.80 Tf 0.420 0.470 0.450 rg 48.00 510.00 Td (FIFO CORRECTNESS STATUS) Tj ET Q
+q BT /F2 9.10 Tf 0.140 0.180 0.180 rg 48.00 500.00 Td (Verified Match) Tj ET Q
+q
+0.60 w
+0.960 0.980 0.970 rg
+0.860 0.890 0.880 RG
+213.76 497.00 167.76 22.00 re B
+Q
+q BT /F1 6.80 Tf 0.420 0.470 0.450 rg 219.76 510.00 Td (LC CORRECTNESS STATUS) Tj ET Q
+q BT /F2 9.10 Tf 0.140 0.180 0.180 rg 219.76 500.00 Td (Verified Match) Tj ET Q
+q
+0.60 w
+0.960 0.980 0.970 rg
+0.860 0.890 0.880 RG
+385.52 497.00 167.76 22.00 re B
+Q
+q BT /F1 6.80 Tf 0.420 0.470 0.450 rg 391.52 510.00 Td (TRI-METHOD CONSENSUS) Tj ET Q
+q BT /F2 8.30 Tf 0.140 0.180 0.180 rg 391.52 500.00 Td (All 3 Return Identical Value) Tj ET Q
+q BT /F2 7.20 Tf 0.260 0.480 0.440 rg 40.00 477.00 Td (SECTION 6) Tj ET Q
+q BT /F2 11.40 Tf 0.140 0.180 0.180 rg 40.00 465.00 Td (Budget Sensitivity / What-If Analysis) Tj ET Q
+q 0.90 w 0.260 0.480 0.440 RG 40.00 461.00 m 555.28 461.00 l S Q
+q
+0.60 w
+0.985 0.992 0.988 rg
+0.820 0.860 0.840 RG
+40.00 353.00 515.28 104.00 re B
+Q
+q BT /F2 7.90 Tf 0.180 0.360 0.320 rg 52.00 444.00 Td (Budget vs. Maximum Achievable Score \(0/1 Knapsack Sensitivity Curve - Investment Portfolio Dataset, 8 Items\)) Tj ET Q
+q 0.80 w 0.550 0.600 0.580 RG 88.00 372.00 m 537.28 372.00 l S Q
+q 0.80 w 0.550 0.600 0.580 RG 88.00 372.00 m 88.00 438.00 l S Q
+q 0.40 w 0.880 0.910 0.890 RG 88.00 372.00 m 537.28 372.00 l S Q
+q BT /F1 6.80 Tf 0.420 0.480 0.460 rg 48.00 369.00 Td (0) Tj ET Q
+q 0.40 w 0.880 0.910 0.890 RG 88.00 394.00 m 537.28 394.00 l S Q
+q BT /F1 6.80 Tf 0.420 0.480 0.460 rg 48.00 391.00 Td (27) Tj ET Q
+q 0.40 w 0.880 0.910 0.890 RG 88.00 416.00 m 537.28 416.00 l S Q
+q BT /F1 6.80 Tf 0.420 0.480 0.460 rg 48.00 413.00 Td (54) Tj ET Q
+q 0.40 w 0.880 0.910 0.890 RG 88.00 438.00 m 537.28 438.00 l S Q
+q BT /F1 6.80 Tf 0.420 0.480 0.460 rg 48.00 435.00 Td (80) Tj ET Q
+q 1.50 w 0.260 0.480 0.440 RG 88.00 385.12 m 177.86 397.83 l S Q
+q 1.50 w 0.260 0.480 0.440 RG 177.86 397.83 m 267.71 409.31 l S Q
+q 1.50 w 0.260 0.480 0.440 RG 267.71 409.31 m 357.57 419.96 l S Q
+q 1.50 w 0.260 0.480 0.440 RG 357.57 419.96 m 447.42 431.44 l S Q
+q 1.50 w 0.260 0.480 0.440 RG 447.42 431.44 m 537.28 438.00 l S Q
+q
+0.60 w
+0.180 0.380 0.340 rg
+85.70 382.82 4.60 4.60 re f
+Q
+q BT /F1 6.30 Tf 0.400 0.460 0.440 rg 74.00 361.00 Td (Rs.2,500) Tj ET Q
+q BT /F2 6.60 Tf 0.180 0.380 0.340 rg 80.00 389.62 Td (16) Tj ET Q
+q
+0.60 w
+0.180 0.380 0.340 rg
+175.56 395.53 4.60 4.60 re f
+Q
+q BT /F1 6.30 Tf 0.400 0.460 0.440 rg 163.86 361.00 Td (Rs.5,200) Tj ET Q
+q BT /F2 6.60 Tf 0.180 0.380 0.340 rg 169.86 402.33 Td (32) Tj ET Q
+q
+0.60 w
+0.180 0.380 0.340 rg
+265.41 407.01 4.60 4.60 re f
+Q
+q BT /F1 6.30 Tf 0.400 0.460 0.440 rg 253.71 361.00 Td (Rs.7,900) Tj ET Q
+q BT /F2 6.60 Tf 0.180 0.380 0.340 rg 259.71 413.81 Td (46) Tj ET Q
+q
+0.60 w
+0.180 0.380 0.340 rg
+355.27 417.66 4.60 4.60 re f
+Q
+q BT /F1 6.30 Tf 0.400 0.460 0.440 rg 343.57 361.00 Td (Rs.10,600) Tj ET Q
+q BT /F2 6.60 Tf 0.180 0.380 0.340 rg 349.57 424.46 Td (58) Tj ET Q
+q
+0.60 w
+0.180 0.380 0.340 rg
+445.12 429.14 4.60 4.60 re f
+Q
+q BT /F1 6.30 Tf 0.400 0.460 0.440 rg 433.42 361.00 Td (Rs.13,300) Tj ET Q
+q BT /F2 6.60 Tf 0.180 0.380 0.340 rg 439.42 435.94 Td (72) Tj ET Q
+q
+0.60 w
+0.180 0.380 0.340 rg
+534.98 435.70 4.60 4.60 re f
+Q
+q BT /F1 6.30 Tf 0.400 0.460 0.440 rg 523.28 361.00 Td (Rs.16,000) Tj ET Q
+q BT /F2 6.60 Tf 0.180 0.380 0.340 rg 529.28 442.50 Td (80) Tj ET Q
+q
+0.60 w
+0.910 0.940 0.920 rg
+0.780 0.830 0.800 RG
+40.00 330.00 515.28 17.00 re B
+Q
+q BT /F2 7.50 Tf 0.200 0.280 0.250 rg 44.00 334.80 Td (Tested Budget) Tj ET Q
+q BT /F2 7.50 Tf 0.200 0.280 0.250 rg 131.60 334.80 Td (Max Score) Tj ET Q
+q BT /F2 7.50 Tf 0.200 0.280 0.250 rg 208.89 334.80 Td (Expenditure) Tj ET Q
+q BT /F2 7.50 Tf 0.200 0.280 0.250 rg 296.49 334.80 Td (Remaining) Tj ET Q
+q BT /F2 7.50 Tf 0.200 0.280 0.250 rg 378.93 334.80 Td (Items) Tj ET Q
+q BT /F2 7.50 Tf 0.200 0.280 0.250 rg 435.61 334.80 Td (LC Time) Tj ET Q
+q BT /F2 7.50 Tf 0.200 0.280 0.250 rg 497.45 334.80 Td (Verification) Tj ET Q
+q
+0.60 w
+1.000 1.000 1.000 rg
+0.880 0.910 0.890 RG
+40.00 314.00 515.28 16.00 re B
+Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 44.00 318.20 Td (Rs. 2,500.00) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 131.60 318.20 Td (16.00 pts) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 208.89 318.20 Td (Rs. 2,500.00) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 296.49 318.20 Td (Rs. 0.00) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 378.93 318.20 Td (1 items) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 435.61 318.20 Td (0.25 ms) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 497.45 318.20 Td (Verified) Tj ET Q
+q
+0.60 w
+0.985 0.992 0.988 rg
+0.880 0.910 0.890 RG
+40.00 298.00 515.28 16.00 re B
+Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 44.00 302.20 Td (Rs. 5,200.00) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 131.60 302.20 Td (31.50 pts) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 208.89 302.20 Td (Rs. 4,700.00) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 296.49 302.20 Td (Rs. 500.00) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 378.93 302.20 Td (2 items) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 435.61 302.20 Td (0.19 ms) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 497.45 302.20 Td (Verified) Tj ET Q
+q
+0.60 w
+1.000 1.000 1.000 rg
+0.880 0.910 0.890 RG
+40.00 282.00 515.28 16.00 re B
+Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 44.00 286.20 Td (Rs. 7,900.00) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 131.60 286.20 Td (45.50 pts) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 208.89 286.20 Td (Rs. 7,700.00) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 296.49 286.20 Td (Rs. 200.00) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 378.93 286.20 Td (3 items) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 435.61 286.20 Td (0.24 ms) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 497.45 286.20 Td (Verified) Tj ET Q
+q
+0.60 w
+0.985 0.992 0.988 rg
+0.880 0.910 0.890 RG
+40.00 266.00 515.28 16.00 re B
+Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 44.00 270.20 Td (Rs. 10,600.00) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 131.60 270.20 Td (58.50 pts) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 208.89 270.20 Td (Rs. 9,700.00) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 296.49 270.20 Td (Rs. 900.00) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 378.93 270.20 Td (4 items) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 435.61 270.20 Td (0.24 ms) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 497.45 270.20 Td (Verified) Tj ET Q
+q
+0.60 w
+1.000 1.000 1.000 rg
+0.880 0.910 0.890 RG
+40.00 250.00 515.28 16.00 re B
+Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 44.00 254.20 Td (Rs. 13,300.00) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 131.60 254.20 Td (72.50 pts) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 208.89 254.20 Td (Rs. 12,700.00) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 296.49 254.20 Td (Rs. 600.00) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 378.93 254.20 Td (5 items) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 435.61 254.20 Td (0.15 ms) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 497.45 254.20 Td (Verified) Tj ET Q
+q
+0.60 w
+0.985 0.992 0.988 rg
+0.880 0.910 0.890 RG
+40.00 234.00 515.28 16.00 re B
+Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 44.00 238.20 Td (Rs. 16,000.00) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 131.60 238.20 Td (80.50 pts) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 208.89 238.20 Td (Rs. 15,700.00) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 296.49 238.20 Td (Rs. 300.00) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 378.93 238.20 Td (5 items) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 435.61 238.20 Td (0.26 ms) Tj ET Q
+q BT /F1 7.70 Tf 0.160 0.200 0.190 rg 497.45 238.20 Td (Verified) Tj ET Q
+q BT /F1 8.90 Tf 0.200 0.240 0.230 rg 40.00 221.10 Td (- Budget expansion increased achievable score: Increasing the available budget from Rs. 2,500.00 to) Tj ET Q
+q BT /F1 8.90 Tf 0.200 0.240 0.230 rg 40.00 209.00 Td (Rs. 16,000.00 \(+Rs. 13,500.00\) improved the maximum achievable score from 16.00 to 80.50 \(+64.50 points\),) Tj ET Q
+q BT /F1 8.90 Tf 0.200 0.240 0.230 rg 40.00 196.89 Td (expanding the optimal selection from 1 to 5 items.) Tj ET Q
+q BT /F1 8.90 Tf 0.200 0.240 0.230 rg 40.00 182.29 Td (- Budget threshold for high-value item "Meridian technology": Budgets up to Rs. 2,500.00 are insufficient) Tj ET Q
+q BT /F1 8.90 Tf 0.200 0.240 0.230 rg 40.00 170.19 Td (to include "Meridian technology" \(cost Rs. 3,500.00, score 18.00\). A minimum budget of Rs. 3,500.00 is) Tj ET Q
+q BT /F1 8.90 Tf 0.200 0.240 0.230 rg 40.00 158.08 Td (required before this item becomes individually feasible.) Tj ET Q
+q BT /F2 7.20 Tf 0.260 0.480 0.440 rg 40.00 141.38 Td (SECTION 7) Tj ET Q
+q BT /F2 11.40 Tf 0.140 0.180 0.180 rg 40.00 129.38 Td (Conclusion) Tj ET Q
+q 0.90 w 0.260 0.480 0.440 RG 40.00 125.38 m 555.28 125.38 l S Q
+q BT /F1 8.90 Tf 0.200 0.240 0.230 rg 40.00 112.48 Td (All three methods \(FIFO, LC, and sparse Dynamic Programming\) independently confirmed the global) Tj ET Q
+q BT /F1 8.90 Tf 0.200 0.240 0.230 rg 40.00 100.37 Td (optimum of 58.50 points at a total cost of Rs. 9,700.00 \(leaving Rs. 300.00 unspent from the Rs.) Tj ET Q
+q BT /F1 8.90 Tf 0.200 0.240 0.230 rg 40.00 88.27 Td (10,000.00 budget across 4 verified items\). LC Branch and Bound explored 17 nodes and pruned 8 nodes in) Tj ET Q
+q BT /F1 8.90 Tf 0.200 0.240 0.230 rg 40.00 76.17 Td (total, including 4 bound-pruned nodes and 4 infeasible nodes, compared to 39 explored nodes for FIFO) Tj ET Q
+q BT /F1 8.90 Tf 0.200 0.240 0.230 rg 40.00 64.06 Td (Branch and Bound.) Tj ET Q
+q 0.5 w 0.85 0.88 0.86 RG 40.00 30.00 m 555.28 30.00 l S Q
+q BT /F1 7.4 Tf 0.480 0.530 0.510 rg 40.00 20.00 Td (BudgetAdvisor \(Group G12\) - 0/1 Knapsack Optimization & Algorithm Analysis Report) Tj ET Q
+q BT /F2 7.4 Tf 0.480 0.530 0.510 rg 505.28 20.00 Td (Page 2 of 2) Tj ET Q
+endstream
+endobj
+xref
+0 9
+0000000000 65535 f 
+0000000015 00000 n 
+0000000064 00000 n 
+0000000127 00000 n 
+0000000224 00000 n 
+0000000326 00000 n 
+0000000468 00000 n 
+0000015278 00000 n 
+0000015420 00000 n 
+trailer
+<< /Size 9 /Root 1 0 R >>
+startxref
+34243
+%%EOF
