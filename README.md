@@ -8,11 +8,11 @@
 - **Course:** Design and Analysis of Algorithms (DAA)
 - **Assigned Algorithm:** 0/1 Knapsack using FIFO Branch and Bound and Least Cost (LC) Branch and Bound
 - **Application:** Budget-Constrained Shopping / Investment Advisor
-- **Team Members (Editable Placeholders — Manual Input Required Before Submission):**
-  - **Member 1: [Full Name]** — FIFO Algorithm Development
-  - **Member 2: [Full Name]** — LC and Algorithm Verification
-  - **Member 3: [Full Name]** — Backend Development
-  - **Member 4: [Full Name]** — Frontend Development
+- **Team Members:**
+  - **Kris Rodrigues** — Project Lead & Chief Systems Architect (FIFO Branch and Bound Lead)
+  - **Krisha Shet** — Algorithm & Baseline Verification Engineer (LC B&B & Sparse DP)
+  - **Megha Gobre** — Backend Infrastructure & Analytical Engines Engineer
+  - **Jeolita Parpatekar** — Frontend & UI/UX Visualization Engineer
 
 ## 3. Problem Statement
 Given a set of $n$ indivisible items or educational investment assets ($0 \le n \le 24$), where each item $i \in \{0, 1, \dots, n-1\}$ has a positive monetary cost $c_i > 0$ and an assigned utility or additive score $v_i \in \mathbb{R}$, and given a fixed non-negative budget $B \ge 0$, determine a binary selection vector $x = (x_0, x_1, \dots, x_{n-1}) \in \{0, 1\}^n$ that maximizes total score without exceeding the available budget:
@@ -328,55 +328,53 @@ We distinguish five memory quantities in the actual implementation:
 
 ## 30. Team Contributions and Workload Distribution
 
-> **Important Note on Authorship & Manual Information Required (Group G12):** The responsibilities listed below represent the suggested four-member workload distribution across the project's four architectural modules, **not** confirmed authorship. Because verified member names and individual authorship confirmations must be provided directly by the student group, the editable `[Full Name]` placeholders below are retained as the **only manual information required from the group** prior to final submission.
+- **Kris Rodrigues** — Project Lead & Chief Systems Architect (FIFO Branch and Bound Lead)
+- **Krisha Shet** — Algorithm & Baseline Verification Engineer (LC B&B & Sparse DP)
+- **Megha Gobre** — Backend Infrastructure & Analytical Engines Engineer
+- **Jeolita Parpatekar** — Frontend & UI/UX Visualization Engineer
 
-### Editable Team Member Placeholders
-- **Member 1:** `[Full Name]`
-- **Member 2:** `[Full Name]`
-- **Member 3:** `[Full Name]`
-- **Member 4:** `[Full Name]`
+### Assigned Roles & Responsibilities
 
-### Suggested Responsibility Structure
-
-**Member 1 — FIFO Algorithm Development (`Member 1: [Full Name]`)**
-- FIFO Branch and Bound.
-- Queue implementation (`collections.deque`).
-- Upper-bound calculation (`upper(depth, cost, score)` in $O(1)$ auxiliary space).
-- Feasibility checking (`node.cost > budget` / `infeasible_pruned`).
+**Kris Rodrigues — Project Lead & Chief Systems Architect (FIFO Algorithm Core)**
+- Overall system architecture, design coordination, and repository integration.
+- FIFO Branch and Bound state-space search implementation (`collections.deque`).
+- Exact rational value-to-cost density sorting and tie-breaking.
+- Index-based $O(1)$-auxiliary-space continuous fractional-knapsack upper-bound computation (`upper`).
+- Budget feasibility checking (`node.cost > budget` / `infeasible_pruned`).
 - Pruning (`bound_pruned` + `infeasible_pruned`).
+- System-wide benchmarking safeguards, execution limits, and multi-platform deployment configuration.
 
-**Member 2 — LC and Algorithm Verification (`Member 2: [Full Name]`)**
-- LC Branch and Bound.
-- Priority queue (`heapq` binary min-heap on `(-node.bound, node.id, node)`).
-- Dynamic Programming verification (`backend/dp_solver.py`).
-- Correctness testing.
-- Complexity analysis.
+**Krisha Shet — Algorithm & Baseline Verification Engineer (LC Algorithm & DP)**
+- LC Branch and Bound state-space search implementation.
+- Priority queue ordering (`heapq` binary min-heap on `(-node.bound, node.id, node)`).
+- Independent Sparse-Cost Dynamic Programming verification baseline (`backend/dp_solver.py` / `solve_dp`).
+- Rigorous algorithm correctness testing, edge-case validation, and empirical algorithm comparison.
+- Theoretical time and space complexity derivation and documentation.
 
-**Member 3 — Backend Development (`Member 3: [Full Name]`)**
-- FastAPI (`backend/server.py`).
-- MongoDB integration (with automatic `_InMemoryClient` fallback).
-- Input validation (`backend/models.py`).
-- Performance benchmarking APIs (`backend/benchmark.py`).
-- Sensitivity analysis APIs (`backend/sensitivity.py`).
-- PDF and CSV generation (`backend/report_generator.py`).
+**Megha Gobre — Backend Infrastructure & Analytical Engines Engineer**
+- FastAPI asynchronous REST and NDJSON streaming API architecture (`backend/server.py`).
+- MongoDB persistence layer with seamless in-memory database fallback (`_InMemoryClient`).
+- Strict Pydantic input validation models and request bounds (`backend/models.py`).
+- Multi-size empirical Benchmarking engine (`backend/benchmark.py`).
+- Parametric What-If Budget Sensitivity engine (`backend/sensitivity.py`).
+- 7-section academic PDF 1.4 report generation and 24-column CSV data export (`backend/report_generator.py`).
 
-**Member 4 — Frontend Development (`Member 4: [Full Name]`)**
-- Dashboard (`frontend/src/pages/Dashboard.tsx`).
-- Shopping and Investment modes.
-- Algorithm visualization (`frontend/src/components/SearchTree.tsx`, `TreeGraphic.tsx`).
-- Step-by-step replay.
-- Performance Analysis (`frontend/src/pages/PerformanceAnalysis.tsx`).
-- What-If Budget Analysis (`frontend/src/pages/WhatIfAnalysis.tsx`).
-- Export interface (`frontend/src/pages/ExportReports.tsx`).
+**Jeolita Parpatekar — Frontend & UI/UX Visualization Engineer**
+- React + TypeScript Single-Page Application (SPA) architecture and modern responsive styling (`frontend/src/App.tsx`).
+- Dual practical application modes (Consumer Shopping Advisor and Educational Investment Advisor).
+- Interactive SVG search-tree algorithm visualization (`SearchTree.tsx` & `TreeGraphic.tsx`).
+- Visit-synchronized step-by-step search replay with monotonic progress snapshot frames.
+- Performance Analysis benchmarking charts, What-If Sensitivity slider view, and Export Reports interface.
+- Manual item selection workspace with linear Undo/Redo history and draft autosave (`useDraftHistory.ts`).
 
 ### Source-File Mapping Table
 
-| Member Placeholder | Suggested Module Role | Suggested Responsibilities | Verified Repository Source Files |
+| Team Member | Project Role | Responsibilities | Verified Repository Source Files |
 | :--- | :--- | :--- | :--- |
-| **Member 1: [Full Name]** | **FIFO Algorithm Development** | FIFO Branch and Bound, queue implementation (`collections.deque`), upper-bound calculation (`upper`), feasibility checking (`infeasible_pruned`), and pruning (`bound_pruned`). | `backend/solver.py`, `frontend/src/localSolver.ts`, `backend/tests/test_solver_algorithm_validation.py` |
-| **Member 2: [Full Name]** | **LC and Algorithm Verification** | LC Branch and Bound, priority queue (`heapq`), Dynamic Programming verification (`solve_dp`), correctness testing, and complexity analysis. | `backend/solver.py`, `backend/dp_solver.py`, `frontend/src/pages/Method.tsx`, `backend/tests/test_dp_stream_regression.py`, `backend/tests/test_comprehensive_rubric_audit.py` |
-| **Member 3: [Full Name]** | **Backend Development** | FastAPI server, MongoDB integration & `_InMemoryClient` fallback, input validation, performance benchmarking APIs, sensitivity analysis APIs, and PDF and CSV generation. | `backend/server.py`, `backend/models.py`, `backend/computation.py`, `backend/benchmark.py`, `backend/sensitivity.py`, `backend/report_generator.py`, `backend/samples.py`, `backend/tests/test_api_e2e_budget_advisor.py`, `backend/tests/test_new_features_benchmark_sensitivity_reports.py` |
-| **Member 4: [Full Name]** | **Frontend Development** | Dashboard, Shopping and Investment modes, algorithm visualization, step-by-step replay, Performance Analysis, What-If Budget Analysis, and Export interface. | `frontend/src/App.tsx`, `frontend/src/pages/Dashboard.tsx`, `frontend/src/pages/PerformanceAnalysis.tsx`, `frontend/src/pages/WhatIfAnalysis.tsx`, `frontend/src/pages/ExportReports.tsx`, `frontend/src/pages/SavedRuns.tsx`, `frontend/src/components/SearchTree.tsx`, `frontend/src/components/TreeGraphic.tsx`, `frontend/src/components/ItemTable.tsx`, `frontend/src/components/SelectionPanel.tsx`, `frontend/src/components/Results.tsx`, `frontend/src/hooks/useWorkspace.ts`, `frontend/src/hooks/useDraftHistory.ts`, `frontend/src/manualSelection.ts`, `frontend/src/frontend_logic.test.mjs` |
+| **Kris Rodrigues** | **Project Lead & Chief Systems Architect** | Overall system architecture, project coordination, FIFO Branch and Bound state-space search, `collections.deque` frontier queue, rational profit-density sorting, index-based $O(1)$-auxiliary-space fractional-knapsack upper bound (`upper`), budget feasibility checking (`infeasible_pruned`), and upper-bound pruning (`bound_pruned`). | `backend/solver.py`, `frontend/src/localSolver.ts`, `backend/tests/test_solver_algorithm_validation.py`, `render.yaml` |
+| **Krisha Shet** | **Algorithm & Baseline Verification Engineer** | Least Cost (LC) Branch and Bound search, `heapq` priority queue ordering on `(-node.bound, node.id, node)`, independent Sparse-Cost Dynamic Programming verification (`solve_dp`), algorithm correctness testing, and theoretical time/space complexity analysis. | `backend/solver.py`, `backend/dp_solver.py`, `frontend/src/pages/Method.tsx`, `backend/tests/test_dp_stream_regression.py`, `backend/tests/test_comprehensive_rubric_audit.py` |
+| **Megha Gobre** | **Backend Infrastructure & Analytical Engines Engineer** | FastAPI server, MongoDB integration & `_InMemoryClient` fallback, input validation, performance benchmarking APIs, sensitivity analysis APIs, and PDF and CSV generation. | `backend/server.py`, `backend/models.py`, `backend/computation.py`, `backend/benchmark.py`, `backend/sensitivity.py`, `backend/report_generator.py`, `backend/samples.py`, `backend/tests/test_api_e2e_budget_advisor.py`, `backend/tests/test_new_features_benchmark_sensitivity_reports.py` |
+| **Jeolita Parpatekar** | **Frontend & UI/UX Visualization Engineer** | Dashboard, Shopping and Investment modes, algorithm visualization, step-by-step replay, Performance Analysis, What-If Budget Analysis, and Export interface. | `frontend/src/App.tsx`, `frontend/src/pages/Dashboard.tsx`, `frontend/src/pages/PerformanceAnalysis.tsx`, `frontend/src/pages/WhatIfAnalysis.tsx`, `frontend/src/pages/ExportReports.tsx`, `frontend/src/pages/SavedRuns.tsx`, `frontend/src/components/SearchTree.tsx`, `frontend/src/components/TreeGraphic.tsx`, `frontend/src/components/ItemTable.tsx`, `frontend/src/components/SelectionPanel.tsx`, `frontend/src/components/Results.tsx`, `frontend/src/hooks/useWorkspace.ts`, `frontend/src/hooks/useDraftHistory.ts`, `frontend/src/manualSelection.ts`, `frontend/src/frontend_logic.test.mjs` |
 
 ## 31. Conclusion and Future Scope
 ### Conclusion

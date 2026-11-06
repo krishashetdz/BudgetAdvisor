@@ -607,14 +607,14 @@ def test_pruning_terminology_and_readme_four_member_placeholders():
 
     repo_root = Path(__file__).resolve().parents[2]
     readme_text = (repo_root / "README.md").read_text(encoding="utf-8")
-    assert "Member 1: [Full Name]" in readme_text
-    assert "Member 2: [Full Name]" in readme_text
-    assert "Member 3: [Full Name]" in readme_text
-    assert "Member 4: [Full Name]" in readme_text
-    assert "Member 1 — FIFO Algorithm Development" in readme_text
-    assert "Member 2 — LC and Algorithm Verification" in readme_text
-    assert "Member 3 — Backend Development" in readme_text
-    assert "Member 4 — Frontend Development" in readme_text
+    assert ("Member 1: [Full Name]" in readme_text) or ("Kris Rodrigues" in readme_text)
+    assert ("Member 2: [Full Name]" in readme_text) or ("Krisha Shet" in readme_text)
+    assert ("Member 3: [Full Name]" in readme_text) or ("Megha Gobre" in readme_text)
+    assert ("Member 4: [Full Name]" in readme_text) or ("Jeolita Parpatekar" in readme_text)
+    assert ("Member 1 — FIFO Algorithm Development" in readme_text) or ("Kris Rodrigues — Project Lead" in readme_text)
+    assert ("Member 2 — LC and Algorithm Verification" in readme_text) or ("Krisha Shet — Algorithm" in readme_text)
+    assert ("Member 3 — Backend Development" in readme_text) or ("Megha Gobre — Backend" in readme_text)
+    assert ("Member 4 — Frontend Development" in readme_text) or ("Jeolita Parpatekar — Frontend" in readme_text)
 
 
 # ============================================================================
