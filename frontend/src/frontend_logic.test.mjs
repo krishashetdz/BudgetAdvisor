@@ -5,7 +5,8 @@
  * - Manual selection (hundredths conversion, selectionTotals, remaining, overBy, percent)
  * - Draft history state machine (seed, change, edit-group coalescing, Undo, Redo, restore, auto-select)
  * - SearchTree replay frame lookup (frames, atVisit binary search, timeline construction)
- * - Client-side FIFO B&B, LC B&B, Sparse DP, Benchmarking, Sensitivity, Saved Runs, and CSV export parity
+ * - Client-side FIFO B&B, LC B&B, Sparse DP, Benchmarking, Sensitivity, Saved Runs, and 24-column CSV export parity
+ * - Zero-budget and no-fit best-case execution flow node-accounting invariants (generated = visited = 2n + 1)
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -252,11 +253,12 @@ test('3. localSolver: FIFO B&B, LC B&B, and Sparse DP match backend optima on Sh
   assert.equal(invRun.lc.total_cost, 9700);
 });
 
-test('4. localSolver: Benchmark, Sensitivity, Saved Runs, and CSV export', () => {
+test('4. localSolver: Benchmark, Sensitivity, Saved Runs, and 24-column CSV export', () => {
   const defaults = localSolver.getDefaultDatasets();
 
   // Benchmark suite
   const bench = localSolver.runLocalBenchmarkSuite({
+    dataset_name: 'Shopping Benchmark Suite',
     mode: 'shopping',
     dataset_source: 'generated',
     sizes: [10, 5, 5],
@@ -266,6 +268,8 @@ test('4. localSolver: Benchmark, Sensitivity, Saved Runs, and CSV export', () =>
     time_limit_ms: 1500,
   });
   assert.equal(bench.warmup_performed, true);
+  assert.equal(bench.dataset_name, 'Shopping Benchmark Suite');
+  assert.equal(bench.seed, 42);
   assert.deepEqual(bench.rows.map(r => r.dataset_size), [5, 10]);
   for (const r of bench.rows) {
     assert.equal(r.verification.all_agree, true);
@@ -273,10 +277,12 @@ test('4. localSolver: Benchmark, Sensitivity, Saved Runs, and CSV export', () =>
     assert.ok(r.lc.nodes_generated >= r.lc.nodes_explored);
   }
 
-  // CSV export
+  // CSV export (24 columns)
   const csv = localSolver.buildLocalBenchmarkCsv(bench);
   const lines = csv.trim().split('\n');
   assert.equal(lines.length, 1 + 2 * 2);
+  assert.ok(lines[0].endsWith('Dataset Name,Dataset Source,Seed'));
+  assert.ok(lines[1].endsWith('"Shopping Benchmark Suite",generated,42'));
 
   // Sensitivity suite
   const sens = localSolver.runLocalSensitivityAnalysis({
@@ -302,4 +308,30 @@ test('4. localSolver: Benchmark, Sensitivity, Saved Runs, and CSV export', () =>
   assert.equal(localSolver.getLocalSavedRuns().length, 1);
   localSolver.deleteLocalRun(run.id);
   assert.equal(localSolver.getLocalSavedRuns().length, 0);
+});
+
+test('5. localSolver: zero-budget and no-fit execution flow visits 2n + 1 nodes (n expansions + n infeasible include pops)', () => {
+  const defaults = localSolver.getDefaultDatasets();
+  const n = defaults.shopping.items.length; // 8 items
+
+  for (const budgetStr of ['0', '100']) {
+    const run = localSolver.computeLocalRun({
+      ...defaults.shopping,
+      budget: budgetStr,
+      max_nodes: 50000,
+      time_limit_ms: 1500,
+    });
+    for (const res of [run.fifo, run.lc]) {
+      assert.equal(res.selected_ids.length, 0);
+      assert.equal(res.total_score, 0);
+      assert.equal(res.total_cost, 0);
+      assert.equal(res.expanded, n);
+      assert.equal(res.generated, 2 * n + 1);
+      assert.equal(res.visited, 2 * n + 1);
+      assert.equal(res.infeasible_pruned, n);
+      assert.equal(res.bound_pruned, 0);
+      assert.equal(res.frontier_remaining, 0);
+      assert.equal(res.proven_optimal, true);
+    }
+  }
 });

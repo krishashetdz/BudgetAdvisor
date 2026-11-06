@@ -211,6 +211,7 @@ class SaveRequest(CompatModel):
 # --- FEATURE 1: PERFORMANCE BENCHMARKING MODELS ---
 
 class BenchmarkRequest(CompatModel):
+    dataset_name: Optional[str] = Field(default=None, max_length=120)
     mode: Literal['shopping', 'investment'] = 'shopping'
     dataset_source: Literal['generated', 'custom'] = 'generated'
     sizes: list[int] = Field(default_factory=lambda: [5, 10, 15, 20, 24])
@@ -307,8 +308,10 @@ class BenchmarkRow(CompatModel):
 
 
 class BenchmarkResponse(CompatModel):
+    dataset_name: str = 'Generated Benchmark Pool'
     mode: Literal['shopping', 'investment']
     dataset_source: Literal['generated', 'custom']
+    seed: int = 42
     repetitions: int
     warmup_performed: bool
     generated_at: str
@@ -418,6 +421,8 @@ class SensitivityResponse(CompatModel):
 
 class ReportExportRequest(CompatModel):
     dataset_name: str = Field(default='Custom Optimization Dataset', min_length=1, max_length=120)
+    run_id: Optional[str] = Field(default=None, max_length=64)
+    dataset_source: Literal['custom', 'generated'] = 'custom'
     mode: Literal['shopping', 'investment'] = 'shopping'
     items: list[Item] = Field(max_length=24) if PYDANTIC_V2 else Field(...)
     budget: Decimal = Field(ge=0, le=100_000_000, decimal_places=2, allow_inf_nan=False) if PYDANTIC_V2 else Field(...)
@@ -428,7 +433,10 @@ class ReportExportRequest(CompatModel):
     sensitivity_max_budget: Optional[Decimal] = None
     sensitivity_intervals: int = Field(default=6, ge=2, le=15)
     include_benchmark: bool = False
+    benchmark_dataset_source: Optional[Literal['custom', 'generated']] = None
     benchmark_sizes: list[int] = Field(default_factory=lambda: [5, 10, 15, 20])
+    benchmark_repetitions: int = Field(default=3, ge=1, le=7)
+    benchmark_seed: int = Field(default=42, ge=1, le=999_999)
 
     if PYDANTIC_V2:
         @model_validator(mode='after')

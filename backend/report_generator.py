@@ -202,9 +202,9 @@ class AcademicPDFBuilder:
             )
             self.draw_text(x + 8, y_top - 10, label.upper(), font='F1', size=6.8, rgb=(0.42, 0.47, 0.45))
             val_str = str(val)
-            if len(val_str) > 30:
-                val_str = val_str[:29] + '.'
-            val_size = 8.3 if len(val_str) > 22 else 9.1
+            if len(val_str) > 38:
+                val_str = val_str[:37] + '.'
+            val_size = 7.5 if len(val_str) > 28 else (8.3 if len(val_str) > 22 else 9.1)
             self.draw_text(x + 8, y_top - 20, val_str, font='F2', size=val_size, rgb=(0.14, 0.18, 0.18))
         self.y -= total_h + 2
 
@@ -262,7 +262,7 @@ class AcademicPDFBuilder:
             self.y = y_box
         self.y -= 5
 
-    def add_sensitivity_chart(self, points: list[SensitivityPoint]):
+    def add_sensitivity_chart(self, points: list[SensitivityPoint], dataset_label: str = ''):
         if not points:
             return
         chart_h = 124.0
@@ -276,12 +276,17 @@ class AcademicPDFBuilder:
             fill_rgb=(0.985, 0.992, 0.988),
             stroke_rgb=(0.82, 0.86, 0.84),
         )
+        chart_title = (
+            f'Budget vs. Maximum Achievable Score (0/1 Knapsack Sensitivity Curve — {dataset_label})'
+            if dataset_label
+            else 'Budget vs. Maximum Achievable Score (0/1 Knapsack Sensitivity Curve)'
+        )
         self.draw_text(
             self.MARGIN_X + 12,
             self.y - 14,
-            'Budget vs. Maximum Achievable Score (0/1 Knapsack Sensitivity Curve)',
+            chart_title,
             font='F2',
-            size=8.3,
+            size=8.1,
             rgb=(0.18, 0.36, 0.32),
         )
 
@@ -398,7 +403,7 @@ class AcademicPDFBuilder:
 
 
 def generate_optimization_pdf_report(req: ReportExportRequest) -> bytes:
-    """Execute actual algorithms and generate the 7-section PDF optimization report."""
+    """Execute actual algorithms, verify mathematical invariants, and generate the 7-section PDF report."""
     solve_req = SolveRequest(
         mode=req.mode,
         items=req.items,
@@ -410,6 +415,21 @@ def generate_optimization_pdf_report(req: ReportExportRequest) -> bytes:
     rec = run.fifo if run.recommended_strategy == 'fifo' else run.lc
     dp = run.dp
 
+    # Mathematical Verification of Selected Recommendation
+    chosen_items = [it for it in req.items if it.id in set(rec.selected_ids)]
+    verified_cost_cents = sum(int(Decimal(str(it.cost)) * 100) for it in chosen_items)
+    verified_score_cents = sum(int(Decimal(str(it.score)) * 100) for it in chosen_items)
+    budget_cents = int(Decimal(str(req.budget)) * 100)
+    remaining_cents = budget_cents - verified_cost_cents
+
+    assert verified_cost_cents == int(round(rec.total_cost * 100)), 'Expenditure must equal sum of selected item costs'
+    assert verified_score_cents == int(round(rec.total_score * 100)), 'Total score must equal sum of selected item scores'
+    assert remaining_cents == int(round(rec.remaining_budget * 100)), 'Remaining budget must equal budget minus expenditure'
+    assert verified_cost_cents <= budget_cents, 'Expenditure must never exceed available budget'
+    if run.fifo.proven_optimal and run.lc.proven_optimal and dp is not None and dp.proven_optimal:
+        assert run.fifo.total_score == run.lc.total_score == dp.total_score, 'Completed FIFO, LC, and DP must agree'
+
+    associated_run_id = (req.run_id or run.id)[:10]
     now_str = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
     pdf = AcademicPDFBuilder(title=f'BudgetAdvisor Report - {req.dataset_name}')
 
@@ -427,8 +447,8 @@ def generate_optimization_pdf_report(req: ReportExportRequest) -> bytes:
         ('Selected Mode', f'{req.mode.title()} Advisor'),
         ('Dataset Name', req.dataset_name),
         ('Available Budget', f'Rs. {float(req.budget):,.2f}'),
-        ('Input Items Count', f'{len(req.items)} of 24 max'),
-        ('Report Generated', now_str),
+        ('Dataset Source & Size', f'{req.dataset_source.title()} ({len(req.items)} of 24 max)'),
+        ('Run ID & Timestamp', f'{associated_run_id} | {now_str}'),
     ], cols=3)
     if req.mode == 'investment':
         pdf.add_paragraph(
@@ -437,7 +457,7 @@ def generate_optimization_pdf_report(req: ReportExportRequest) -> bytes:
         )
 
     # Section 2: Input Dataset
-    pdf.add_section_heading('2', f'Input Dataset ({len(req.items)} Items)')
+    pdf.add_section_heading('2', f'Input Dataset ({len(req.items)} Items — {req.dataset_name})')
     if req.items:
         item_rows = []
         selected_set = set(rec.selected_ids)
@@ -472,7 +492,6 @@ def generate_optimization_pdf_report(req: ReportExportRequest) -> bytes:
         ('Optimality Status', 'Proven Optimal' if rec.proven_optimal else f'Capped ({rec.stop_reason})'),
     ], cols=3)
 
-    chosen_items = [it for it in req.items if it.id in set(rec.selected_ids)]
     if chosen_items:
         rec_rows = [
             [str(i + 1), it.name, f'Rs. {float(it.cost):,.2f}', f'{float(it.score):,.2f} pts']
@@ -524,13 +543,22 @@ def generate_optimization_pdf_report(req: ReportExportRequest) -> bytes:
     )
 
     if req.include_benchmark and req.benchmark_sizes:
+        b_source = req.benchmark_dataset_source or ('custom' if len(req.items) > 0 else 'generated')
+        if b_source == 'custom' and len(req.items) == 0:
+            b_source = 'generated'
         bench_req = BenchmarkRequest(
+            dataset_name=(
+                req.dataset_name
+                if b_source == 'custom'
+                else f'Generated {req.mode.title()} Benchmark Pool (Seed {req.benchmark_seed})'
+            ),
             mode=req.mode,
-            dataset_source='custom' if len(req.items) > 0 else 'generated',
+            dataset_source=b_source,
             sizes=req.benchmark_sizes,
-            repetitions=2,
-            budget=req.budget if len(req.items) > 0 else None,
-            custom_items=req.items if len(req.items) > 0 else None,
+            repetitions=req.benchmark_repetitions,
+            seed=req.benchmark_seed,
+            budget=req.budget if b_source == 'custom' else None,
+            custom_items=req.items if b_source == 'custom' else None,
             max_nodes=req.max_nodes,
             time_limit_ms=req.time_limit_ms,
         )
@@ -548,10 +576,16 @@ def generate_optimization_pdf_report(req: ReportExportRequest) -> bytes:
                     f'{m.max_queue_size:,}',
                     f'{m.optimal_value:,.2f}',
                 ])
+        src_desc = (
+            f'Source: Custom [{req.dataset_name}], Budget Rs. {float(req.budget):,.0f}, Seed {req.benchmark_seed}'
+            if b_source == 'custom'
+            else f'Source: Generated Pool [{req.mode.title()}], Seed {req.benchmark_seed}'
+        )
         pdf.add_paragraph(
-            'Multi-Size Scaling Benchmark Summary (Median Execution Time & Node Counts):',
+            f'Multi-Size Scaling Benchmark Summary ({src_desc}):',
             font='F2',
-            size=8.8,
+            size=8.3,
+            max_chars=118,
             keep_with_next=min(190.0, 24.0 + len(bench_rows) * 16.5),
         )
         pdf.add_table(
@@ -606,7 +640,7 @@ def generate_optimization_pdf_report(req: ReportExportRequest) -> bytes:
             time_limit_ms=req.time_limit_ms,
         )
         sens_res: SensitivityResponse = run_sensitivity_analysis(sens_req)
-        pdf.add_sensitivity_chart(sens_res.points)
+        pdf.add_sensitivity_chart(sens_res.points, dataset_label=f'{req.dataset_name}, {len(req.items)} Items')
         sens_rows = [
             [
                 f'Rs. {pt.budget:,.2f}',
@@ -649,7 +683,8 @@ def generate_optimization_pdf_report(req: ReportExportRequest) -> bytes:
 
     ver_sentence = (
         f'All three methods (FIFO, LC, and sparse Dynamic Programming) independently confirmed the global optimum of '
-        f'{rec.total_score:,.2f} points at a total cost of Rs. {rec.total_cost:,.2f} (leaving Rs. {rec.remaining_budget:,.2f} unspent).'
+        f'{rec.total_score:,.2f} points at a total cost of Rs. {rec.total_cost:,.2f} (leaving Rs. {rec.remaining_budget:,.2f} unspent '
+        f'from the Rs. {float(req.budget):,.2f} budget across {len(chosen_items)} verified items).'
         if (run.comparison_complete and dp and dp.proven_optimal and rec.total_score == dp.total_score)
         else f'The best combination discovered achieved a score of {rec.total_score:,.2f} points at a cost of Rs. {rec.total_cost:,.2f}.'
     )
@@ -659,7 +694,7 @@ def generate_optimization_pdf_report(req: ReportExportRequest) -> bytes:
 
 
 def generate_benchmark_csv(benchmark: BenchmarkResponse) -> str:
-    """Serialize benchmark results to a clean CSV string."""
+    """Serialize benchmark results to a clean CSV string with explicit dataset source and seed identification."""
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow([
@@ -684,6 +719,9 @@ def generate_benchmark_csv(benchmark: BenchmarkResponse) -> str:
         'DP Optimal Value',
         'Matches DP',
         'Verification Status',
+        'Dataset Name',
+        'Dataset Source',
+        'Seed',
     ])
     for row in benchmark.rows:
         for algo_metrics, matches_dp in [
@@ -712,5 +750,8 @@ def generate_benchmark_csv(benchmark: BenchmarkResponse) -> str:
                 f'{row.verification.dp_optimal_value:.2f}',
                 'Yes' if matches_dp else 'No',
                 row.verification.status_label,
+                benchmark.dataset_name,
+                benchmark.dataset_source,
+                benchmark.seed,
             ])
     return output.getvalue()

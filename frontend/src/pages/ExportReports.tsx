@@ -27,6 +27,8 @@ export default function ExportReports({ workspace: w }: { workspace: Workspace }
   const [includeSensitivity, setIncludeSensitivity] = useState<boolean>(true);
   const [sensitivityIntervals, setSensitivityIntervals] = useState<number>(6);
   const [includeBenchmark, setIncludeBenchmark] = useState<boolean>(false);
+  const [benchmarkSource, setBenchmarkSource] = useState<'custom' | 'generated'>('generated');
+  const [benchmarkSeed, setBenchmarkSeed] = useState<number>(42);
   const [downloadingPdf, setDownloadingPdf] = useState<boolean>(false);
   const [downloadingCsv, setDownloadingCsv] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,8 +40,11 @@ export default function ExportReports({ workspace: w }: { workspace: Workspace }
     setDownloadingPdf(true);
     setError(null);
     try {
+      const cleanName = datasetName.trim() || `${w.mode.toUpperCase()} Dataset`;
       const blob = await downloadPdfReport({
-        dataset_name: datasetName.trim() || `${w.mode.toUpperCase()} Dataset`,
+        dataset_name: cleanName,
+        run_id: w.run?.id,
+        dataset_source: 'custom',
         mode: w.mode,
         items: w.data.items,
         budget: w.data.budget,
@@ -48,7 +53,10 @@ export default function ExportReports({ workspace: w }: { workspace: Workspace }
         include_sensitivity: includeSensitivity,
         sensitivity_intervals: sensitivityIntervals,
         include_benchmark: includeBenchmark,
+        benchmark_dataset_source: benchmarkSource,
         benchmark_sizes: [5, 10, 15, 20],
+        benchmark_repetitions: 3,
+        benchmark_seed: benchmarkSeed,
       });
       triggerBrowserDownload(blob, `budgetadvisor_${w.mode}_report.pdf`);
       toast.success('Optimization PDF report downloaded');
@@ -65,12 +73,19 @@ export default function ExportReports({ workspace: w }: { workspace: Workspace }
     setDownloadingCsv(true);
     setError(null);
     try {
+      const cleanName = datasetName.trim() || `${w.mode.toUpperCase()} Dataset`;
+      const useCustom = benchmarkSource === 'custom' && w.data && w.data.items.length > 0;
       const blob = await downloadBenchmarkCsv({
+        dataset_name: useCustom
+          ? cleanName
+          : `Generated ${w.mode.charAt(0).toUpperCase() + w.mode.slice(1)} Benchmark Pool (Seed ${benchmarkSeed})`,
         mode: w.mode,
-        dataset_source: 'generated',
+        dataset_source: useCustom ? 'custom' : 'generated',
         sizes: [5, 10, 15, 20, 24],
         repetitions: 3,
-        seed: 42,
+        seed: benchmarkSeed,
+        budget: useCustom && w.data ? w.data.budget : undefined,
+        custom_items: useCustom && w.data ? w.data.items : undefined,
         max_nodes: w.maxNodes,
         time_limit_ms: 1500,
       });
@@ -96,7 +111,7 @@ export default function ExportReports({ workspace: w }: { workspace: Workspace }
             Export optimization reports<span className="heading-period">.</span>
           </h1>
           <p data-testid="reports-subtitle">
-            Generate downloadable PDF optimization reports and benchmark CSV tables computed directly from live solver runs.
+            Generate downloadable PDF optimization reports and benchmark CSV tables computed directly from live solver runs with explicit dataset source and seed identification.
           </p>
         </div>
         <div className="mode-switch" role="group" aria-label="Dataset mode">
@@ -154,13 +169,13 @@ export default function ExportReports({ workspace: w }: { workspace: Workspace }
             </div>
           </div>
           <p className="report-description">
-            Generates a formatted multi-page PDF document containing your current dataset, optimal recommendation, FIFO vs. LC Branch and Bound metrics, Dynamic Programming verification, embedded budget sensitivity curve, and conclusion.
+            Generates a formatted 2-page PDF document containing your current custom dataset ({w.data?.items.length || 0} items, budget {money(Number(w.data?.budget || 0))}), optimal recommendation, FIFO vs. LC Branch and Bound metrics, Dynamic Programming verification, embedded budget sensitivity curve, and conclusion.
           </p>
 
           <div className="report-form-fields">
             <div className="control-group">
               <label htmlFor="report-dataset-name" className="control-label">
-                Dataset Title in Report
+                Dataset Title in Report &amp; CSV
               </label>
               <input
                 id="report-dataset-name"
@@ -181,7 +196,7 @@ export default function ExportReports({ workspace: w }: { workspace: Workspace }
                   checked={includeSensitivity}
                   onChange={e => setIncludeSensitivity(e.target.checked)}
                 />
-                <span>Include Section 6: Budget Sensitivity Analysis & Curve</span>
+                <span>Include Section 6: Budget Sensitivity Analysis &amp; Curve</span>
               </label>
 
               {includeSensitivity && (
@@ -215,13 +230,13 @@ export default function ExportReports({ workspace: w }: { workspace: Workspace }
           <div className="report-sections-preview" data-testid="report-sections-list">
             <span>Included Report Sections:</span>
             <ul>
-              <li><Check size={13} /> Section 1: Project & Optimization Details (Group G12, {w.mode.toUpperCase()}, Budget {money(Number(w.data?.budget || 0))})</li>
-              <li><Check size={13} /> Section 2: Input Dataset ({w.data?.items.length || 0} items with costs & scores)</li>
+              <li><Check size={13} /> Section 1: Project &amp; Optimization Details (Group G12, {w.mode.toUpperCase()}, Budget {money(Number(w.data?.budget || 0))}, Run ID {w.run?.id.slice(0, 8) || 'live'})</li>
+              <li><Check size={13} /> Section 2: Input Dataset ({w.data?.items.length || 0} custom items with costs &amp; scores)</li>
               <li><Check size={13} /> Section 3: Optimal Recommendation ({rec ? `${number(rec.total_score)} pts, ${rec.selected_ids.length} items` : 'Computed on export'})</li>
               <li><Check size={13} /> Section 4: Algorithm Performance (FIFO vs. LC execution time, nodes, queue size)</li>
-              <li><Check size={13} /> Section 5: Verification (DP baseline parity & execution limit checks)</li>
-              <li><Check size={13} /> Section 6: Budget Sensitivity Analysis (Vector graph & stepwise table)</li>
-              <li><Check size={13} /> Section 7: Automated Empirical Conclusion</li>
+              <li><Check size={13} /> Section 5: Verification (DP baseline parity &amp; execution limit checks)</li>
+              <li><Check size={13} /> Section 6: Budget Sensitivity Analysis (Vector graph &amp; stepwise table on same dataset)</li>
+              <li><Check size={13} /> Section 7: Automated Empirical Conclusion &amp; Mathematical Audit</li>
             </ul>
           </div>
 
@@ -242,24 +257,58 @@ export default function ExportReports({ workspace: w }: { workspace: Workspace }
               <FileSpreadsheet size={22} />
             </span>
             <div>
-              <span className="section-kicker">RAW EMPIRICAL DATA</span>
+              <span className="section-kicker">RAW EMPIRICAL DATA · SHARED CONFIG</span>
               <h2>Benchmark Results CSV Export</h2>
             </div>
           </div>
           <p className="report-description">
-            Executes the multi-size benchmark suite (5, 10, 15, 20, and 24 items) for {w.mode} mode and exports a structured CSV spreadsheet for external plotting, LaTeX tables, or lab notebooks.
+            Executes the multi-size benchmark suite (5, 10, 15, 20, and 24 items) for {w.mode} mode and exports a 24-column CSV spreadsheet recording every metric alongside the explicit Dataset Name, Dataset Source (<code>{benchmarkSource}</code>), and Seed (<code>{benchmarkSeed}</code>).
           </p>
 
+          <div className="report-form-fields">
+            <div className="control-group">
+              <label htmlFor="export-benchmark-source" className="control-label">
+                Benchmark Dataset Source (Shared by CSV &amp; PDF Section 4)
+              </label>
+              <select
+                id="export-benchmark-source"
+                data-testid="export-benchmark-source-select"
+                className="feature-select"
+                value={benchmarkSource}
+                onChange={e => setBenchmarkSource(e.target.value as 'custom' | 'generated')}
+              >
+                <option value="generated">Generated Benchmark Pool (Seeded, 45% Positive-Cost Budget per Size)</option>
+                <option value="custom">Current Custom Workspace Dataset ({w.data?.items.length || 0} Base Items, Fixed Budget {money(Number(w.data?.budget || 0))})</option>
+              </select>
+            </div>
+
+            <div className="control-group">
+              <label htmlFor="export-benchmark-seed" className="control-label">
+                Reproducible Random Seed
+              </label>
+              <input
+                id="export-benchmark-seed"
+                data-testid="export-benchmark-seed-input"
+                type="number"
+                min={1}
+                max={999999}
+                className="feature-input"
+                value={benchmarkSeed}
+                onChange={e => setBenchmarkSeed(Math.max(1, Number(e.target.value) || 42))}
+              />
+            </div>
+          </div>
+
           <div className="report-sections-preview">
-            <span>Included CSV Columns:</span>
+            <span>Included CSV Columns (24 Columns):</span>
             <ul>
-              <li><Check size={13} /> Dataset Size (5, 10, 15, 20, 24) & Available Budget</li>
+              <li><Check size={13} /> Dataset Size (5, 10, 15, 20, 24), Mode &amp; Available Budget (INR)</li>
               <li><Check size={13} /> Algorithm Strategy (FIFO vs. LC Branch and Bound)</li>
-              <li><Check size={13} /> Execution Time (Median, Min, and Max in ms)</li>
-              <li><Check size={13} /> Nodes Generated, Nodes Explored, and Nodes Pruned</li>
+              <li><Check size={13} /> Execution Time (Median, Min, and Max in ms across 3 repetitions)</li>
+              <li><Check size={13} /> Nodes Generated, Nodes Explored, Nodes Pruned (Bound + Infeasible)</li>
               <li><Check size={13} /> Maximum Frontier Queue Size</li>
-              <li><Check size={13} /> Optimal Value, Selected Cost, and Remaining Budget</li>
-              <li><Check size={13} /> Dynamic Programming Verification & Completion Status</li>
+              <li><Check size={13} /> Optimal Value, Selected Cost, Remaining Budget &amp; DP Verification</li>
+              <li><Check size={13} /> Explicit Dataset Name, Dataset Source (<code>{benchmarkSource}</code>), and Seed (<code>{benchmarkSeed}</code>)</li>
             </ul>
           </div>
 

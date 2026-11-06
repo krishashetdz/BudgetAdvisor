@@ -115,7 +115,7 @@ backend:
     status_history:
       - working: true
         agent: "main"
-        comment: "FIFO queue-based level-by-level search implemented with fractional knapsack bounding function and deterministic tie-breaking. Verified against exhaustive and DP baselines across 37 algorithmic tests plus rubric audit tests."
+        comment: "FIFO queue-based level-by-level search with index-based O(1) auxiliary space fractional knapsack bounding (range(depth, n_items)) and deterministic tie-breaking. Verified against exhaustive and DP baselines across 37 algorithmic tests plus rubric audit tests."
 
   - task: "0/1 Knapsack LC (Least Cost / Best-First) Branch and Bound Solver"
     implemented: true
@@ -127,7 +127,7 @@ backend:
     status_history:
       - working: true
         agent: "main"
-        comment: "LC priority-queue-based search with (-node.bound, node.id, node) ordering. Explores highest promising bound first. Pruning, bounding, and node-limit semantics (visited vs generated) verified."
+        comment: "LC priority-queue-based search with (-node.bound, node.id, node) ordering and index-based O(1) auxiliary space upper bound. Explores highest promising bound first. Pruning, bounding, zero-budget/no-fit (2n+1 nodes), and node-limit semantics (visited vs generated) verified."
 
   - task: "Independent Dynamic Programming (DP) Baseline Solver"
     implemented: true
@@ -151,7 +151,7 @@ backend:
     status_history:
       - working: true
         agent: "main"
-        comment: "Verified identical datasets for FIFO & LC, size deduplication/sorting, warm-up execution, multi-repetition median calculation, generated/explored/pruned/max_queue_size counts, DP agreement, and node/time limit handling."
+        comment: "Verified identical datasets for FIFO & LC, explicit dataset_name & seed metadata, size deduplication/sorting, warm-up execution, multi-repetition median calculation, generated/explored/pruned/max_queue_size counts, DP agreement, and node/time limit handling."
 
   - task: "What-If Budget Sensitivity Analysis & API (/api/sensitivity)"
     implemented: true
@@ -175,7 +175,7 @@ backend:
     status_history:
       - working: true
         agent: "main"
-        comment: "Fixed first-page header spacing (separated Group G12 & UTC timestamp top bar from main title), improved pagination so 8-item reports with/without benchmark fit cleanly on 2 pages without sparse 3rd-page whitespace, and verified 21-column CSV export."
+        comment: "Verified 2-page PDF layout, separated Group G12 & UTC timestamp header, mathematical verification assertions, explicit dataset source/name/seed/run_id metadata, and 24-column CSV export consistency."
 
 frontend:
   - task: "Shopping & Investment Mode Selection, Manual Selection & Undo/Redo Controls"
@@ -212,12 +212,12 @@ frontend:
     status_history:
       - working: true
         agent: "main"
-        comment: "Updated Method.tsx with verified FIFO O(n log n + k n log n), LC O(n log n + k(n log n + log k)), and Sparse DP O(sum (i+1) S_i) <= O(n^2 S) complexities, 4-part space analysis, and generated vs explored node-limit distinctions."
+        comment: "Updated Method.tsx with accurate best-case execution flow (budget=0, no-fit, root, child generation, feasibility/bound pruning), FIFO O(n log n + k n log n), LC O(n log n + k(n log n + log k)), Sparse DP O(sum (i+1) S_i) <= O(n^2 S), 5-part space analysis, and 6-part node-limit semantics."
 
 metadata:
   created_by: "main_agent"
-  version: "2.0"
-  test_sequence: 2
+  version: "3.0"
+  test_sequence: 3
   run_ui: true
 
 test_plan:
@@ -233,17 +233,17 @@ test_plan:
 
 agent_communication:
   - agent: "main"
-    message: "Executed full backend pytest suite (102 passed, 0 failed, 0 skipped) and frontend Node.js logic test suite (4 passed, 0 failed, 0 skipped) on 2026-11-05."
+    message: "Executed full backend pytest suite (105 passed, 0 failed, 0 skipped) and frontend Node.js logic test suite (5 passed, 0 failed, 0 skipped) on 2026-11-06."
 
 #====================================================================================================
-# Latest Automated Test Execution Summary (2026-11-05)
+# Latest Automated Test Execution Summary (2026-11-06)
 #====================================================================================================
-# Date of Execution: 2026-11-05
+# Date of Execution: 2026-11-06
 #
 # 1. Backend & End-to-End Pytest Suite:
 #    - Command: `cd backend && pytest -v`
-#    - Tests Executed: 102
-#    - Passed Tests: 102
+#    - Tests Executed: 105
+#    - Passed Tests: 105
 #    - Failed Tests: 0
 #    - Skipped Tests: 0
 #    - Breakdown by Module:
@@ -251,12 +251,12 @@ agent_communication:
 #      * `tests/test_api_e2e_budget_advisor.py`: 17 passed
 #      * `tests/test_dp_stream_regression.py`: 16 passed
 #      * `tests/test_new_features_benchmark_sensitivity_reports.py`: 17 passed
-#      * `tests/test_comprehensive_rubric_audit.py`: 15 passed (includes subprocess execution of frontend logic suite)
+#      * `tests/test_comprehensive_rubric_audit.py`: 18 passed (includes AST slice check, zero-budget/no-fit node counts, PDF/CSV dataset consistency, and subprocess execution of frontend logic suite)
 #
 # 2. Frontend Logic Test Suite (Node.js):
 #    - Command: `cd frontend && node --test src/frontend_logic.test.mjs`
-#    - Tests Executed: 4 subtest suites
-#    - Passed Tests: 4
+#    - Tests Executed: 5 subtest suites
+#    - Passed Tests: 5
 #    - Failed Tests: 0
 #    - Skipped Tests: 0
 #

@@ -8,8 +8,8 @@ B. Budget Sensitivity (min/max budget, multiple intervals, independent evaluatio
    remaining budget accuracy, solver score parity, Shopping & Investment modes, verification status).
 C. PDF Export (successful PDF 1.4 generation, actual optimization/benchmark/sensitivity values, missing optional
    data handling, incomplete search warnings, 24-item large dataset handling, Investment mode disclaimer).
-D. CSV Export (successful generation, 21 required columns, exact value parity, no duplicate rows,
-   graceful handling of empty/missing or capped data).
+D. CSV Export (successful generation, 24 required columns including Dataset Name/Source/Seed, exact value parity,
+   no duplicate rows, graceful handling of empty/missing or capped data).
 """
 from __future__ import annotations
 
@@ -83,6 +83,9 @@ def test_benchmark_different_dataset_sizes_and_identical_inputs():
     )
     res = run_benchmark_suite(req)
     assert res.mode == "shopping"
+    assert res.dataset_source == "generated"
+    assert res.seed == 42
+    assert "Seed 42" in res.dataset_name
     assert res.warmup_performed is True
     assert len(res.rows) == len(sizes)
 
@@ -145,6 +148,7 @@ def test_benchmark_dataset_sizes_sorted_and_deduplicated():
     )
     res = run_benchmark_suite(req)
     assert [r.dataset_size for r in res.rows] == [5, 10, 15]
+    assert res.seed == 99
 
 
 def test_benchmark_warmup_and_repeated_runs_median_calculation(shopping_sample):
@@ -415,6 +419,8 @@ def test_pdf_report_generation_and_content_accuracy(shopping_sample):
     selected items, FIFO/LC node metrics, DP verification, and sensitivity data."""
     req = ReportExportRequest(
         dataset_name="Academic Evaluation Set",
+        run_id="run-g12-test",
+        dataset_source="custom",
         mode="shopping",
         items=shopping_sample["items"],
         budget=Decimal("10000.00"),
@@ -433,6 +439,7 @@ def test_pdf_report_generation_and_content_accuracy(shopping_sample):
     # Verify all 7 sections and exact solver figures appear in PDF text
     assert "GROUP ID: G12" in full_text
     assert "Academic Evaluation Set" in full_text
+    assert "run-g12-te" in full_text
     assert "Project and Optimization Details" in full_text
     assert "Input Dataset" in full_text
     assert "Optimal Recommendation" in full_text
@@ -488,7 +495,7 @@ def test_pdf_report_large_24_item_dataset_does_not_break():
     assert len(reader.pages) >= 2
     full_text = "\n".join(page.extract_text() or "" for page in reader.pages)
     assert "Max 24-Item Stress Dataset" in full_text
-    assert "Input Dataset (24 Items)" in full_text
+    assert "Input Dataset (24 Items" in full_text
     assert "Multi-Size Scaling Benchmark Summary" in full_text
 
 
@@ -497,9 +504,10 @@ def test_pdf_report_large_24_item_dataset_does_not_break():
 # ============================================================================
 
 def test_csv_report_generation_matches_benchmark_and_no_duplicates():
-    """Verify CSV export includes all 21 columns, matches backend benchmark calculations exactly,
-    and does not duplicate rows even when duplicate sizes are requested."""
+    """Verify CSV export includes all 24 columns (including Dataset Name, Dataset Source, Seed),
+    matches backend benchmark calculations exactly, and does not duplicate rows."""
     bench_req = BenchmarkRequest(
+        dataset_name="Reproducible Shopping Pool",
         mode="shopping",
         dataset_source="generated",
         sizes=[5, 10, 5, 10],
@@ -533,6 +541,9 @@ def test_csv_report_generation_matches_benchmark_and_no_duplicates():
         "DP Optimal Value",
         "Matches DP",
         "Verification Status",
+        "Dataset Name",
+        "Dataset Source",
+        "Seed",
     ]
     assert header == expected_columns
 
@@ -549,19 +560,27 @@ def test_csv_report_generation_matches_benchmark_and_no_duplicates():
     assert float(fifo_row[13]) == r0.fifo.optimal_value
     assert float(fifo_row[14]) == r0.fifo.selected_cost
     assert float(fifo_row[15]) == r0.fifo.remaining_budget
+    assert fifo_row[21] == "Reproducible Shopping Pool"
+    assert fifo_row[22] == "generated"
+    assert fifo_row[23] == "42"
 
     assert lc_row[0] == "5"
     assert lc_row[3] == "LC"
     assert int(lc_row[7]) == r0.lc.nodes_generated
     assert int(lc_row[8]) == r0.lc.nodes_explored
     assert float(lc_row[13]) == r0.lc.optimal_value
+    assert lc_row[21] == "Reproducible Shopping Pool"
+    assert lc_row[22] == "generated"
+    assert lc_row[23] == "42"
 
 
 def test_csv_export_handles_empty_rows_gracefully():
     """Verify generate_benchmark_csv handles an empty BenchmarkResponse.rows list gracefully."""
     empty_bench = BenchmarkResponse(
+        dataset_name="Empty Test Pool",
         mode="shopping",
         dataset_source="generated",
+        seed=42,
         repetitions=1,
         warmup_performed=True,
         generated_at="2026-11-05T00:00:00Z",
@@ -572,6 +591,7 @@ def test_csv_export_handles_empty_rows_gracefully():
     parsed = list(csv.reader(io.StringIO(csv_text)))
     assert len(parsed) == 1
     assert parsed[0][0] == "Dataset Size"
+    assert parsed[0][-3:] == ["Dataset Name", "Dataset Source", "Seed"]
 
 
 def test_api_pdf_and_csv_export_endpoints(api_client, shopping_sample):

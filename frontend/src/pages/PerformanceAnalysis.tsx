@@ -56,6 +56,10 @@ export default function PerformanceAnalysis({ workspace: w }: { workspace: Works
   };
 
   const buildPayload = (): BenchmarkRequestPayload => ({
+    dataset_name:
+      datasetSource === 'custom'
+        ? `Custom ${w.mode.charAt(0).toUpperCase() + w.mode.slice(1)} Dataset (${w.data?.items.length || 0} base items)`
+        : `Generated ${w.mode.charAt(0).toUpperCase() + w.mode.slice(1)} Benchmark Pool (Seed ${seed})`,
     mode: w.mode,
     dataset_source: datasetSource,
     sizes: selectedSizes,
@@ -286,7 +290,7 @@ export default function PerformanceAnalysis({ workspace: w }: { workspace: Works
                 </h2>
               </div>
               <span className="count-tag" data-testid="benchmark-meta-tag">
-                Warm-up + {benchmark.repetitions}× median · Limit {number(w.maxNodes)} explored nodes
+                {benchmark.dataset_name || benchmark.dataset_source} · Seed {benchmark.seed ?? seed} · Warm-up + {benchmark.repetitions}× median · Limit {number(w.maxNodes)} explored nodes
               </span>
             </div>
 

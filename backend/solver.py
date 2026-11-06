@@ -10,18 +10,44 @@ Node-Counting & Search-Limit Terminology
 ----------------------------------------
 Let:
   - n = number of available input items (0 <= n <= 24).
-  - k_gen (`generated`) = total search-tree nodes created and pushed into the frontier
-        (root + 2 children per expanded node, so k_gen = 1 + 2 * expanded).
-  - k_exp (`visited`) = total search-tree nodes popped (explored) from the frontier.
-  - `pruned` = total explored nodes discarded without expansion
-        (`infeasible_pruned + bound_pruned`).
-  - m (`frontier_remaining` at termination, peak `max_queue_size` during search) =
-        number of live nodes currently held in the search frontier (FIFO deque or LC heap),
-        satisfying `generated = visited + frontier_remaining` at all times.
-  - `request.max_nodes` (default 50,000) = configured search node limit applied strictly to
-        explored (`visited`) nodes (`visited <= request.max_nodes`). Because each expanded
-        node generates two children (`include` and `exclude`), `generated` can exceed
-        `request.max_nodes` (up to `2 * visited + 1 <= 100,001` nodes).
+  -1. `generated` (k_gen) = total search-tree nodes constructed and pushed into the frontier
+        via `push(node)`. Comprises the root node (id=0) plus two children (`include` and
+        `exclude`) created whenever an explored node at `depth < n` is expanded, so
+        `generated = 1 + 2 * expanded` holds unconditionally. Both children—including an
+        `include` child whose cost exceeds `budget` or whose bound is below `best_score`—are
+        pushed into the frontier on generation and counted in `generated`.
+  -2. `visited` (k_exp, explored/visited nodes) = total search-tree nodes popped from the
+        frontier (`queue.popleft()` in FIFO or `heapq.heappop(heap)` in LC) and evaluated
+        in the main `while` loop. Every explored (`visited`) node is classified into
+        exactly one of four mutually exclusive outcomes:
+          (a) `pruned_budget` (`infeasible_pruned`): `node.cost > budget`.
+          (b) `pruned_bound` (`bound_pruned`): `node.cost <= budget` and `node.bound < best_score`.
+          (c) `leaf`: `node.cost <= budget`, `node.bound >= best_score`, and `node.depth == n`.
+          (d) `expanded`: `node.cost <= budget`, `node.bound >= best_score`, and `node.depth < n`.
+        Thus `visited = expanded + pruned + leaf_visited`.
+  -3. `pruned` = total explored (`visited`) nodes discarded without expansion:
+        `pruned = infeasible_pruned + bound_pruned`.
+        Note: Infeasible (`cost > budget`) or bound-dominated (`bound < best_score`) child
+        nodes are first counted as `generated` when pushed by their parent's expansion, and
+        are subsequently counted as `visited` and `pruned` only when popped from the frontier.
+        If the search stops early due to a limit while such a child is still waiting in the
+        frontier, it is counted in `generated` and `frontier_remaining`, not in `visited` or `pruned`.
+  -4. `frontier_remaining` (m at termination; peak `max_queue_size` = m_max during search) =
+        number of unpopped live nodes still held in the FIFO `deque` or LC `heap` when the
+        search terminates (`len(queue)` or `len(heap)`). Because every `generated` node is
+        pushed into the frontier and every `visited` node is popped from the frontier, the
+        conservation identity `generated = visited + frontier_remaining` holds at every step
+        of this implementation. Optimality is mathematically proven (`proven_optimal = True`)
+        if and only if `frontier_remaining == 0`.
+  -5. Configured Search-Node Limit (`request.max_nodes`, default 50,000) = enforced at the
+        start of each loop iteration via `if visited >= request.max_nodes: stop_reason = 'node_limit'; break`.
+        This limit caps **explored (`visited`)** nodes (`visited <= request.max_nodes`),
+        NOT `generated` nodes. Because each expanded node generates 2 children, `generated`
+        can legitimately exceed `request.max_nodes` (up to `2 * visited + 1 <= 100,001`).
+  -6. Execution Timeout (`request.time_limit_ms`, default 1,500 ms) = enforced at the start
+        of each loop iteration via `if (perf_counter() - start) * 1000 >= request.time_limit_ms:
+        stop_reason = 'time_limit'; break`. When triggered with live nodes still in the
+        frontier, `proven_optimal` is set to `False` and `stop_reason = 'time_limit'`.
   - k = asymptotic search-tree node count (since k_exp <= k_gen <= 2 * k_exp + 1,
         k_gen = Theta(k_exp) = Theta(k), with 1 <= k <= 2^(n+1) - 1 in an uncapped tree).
 
@@ -32,78 +58,105 @@ Algorithmic & Implementation-Accurate Complexity Summary
    exact rational value-to-cost density (v_i / c_i) via `Fraction(score_hundredths, cost_hundredths)`,
    breaking ties by original item index:
      - Time Complexity: O(n log n)
-     - Auxiliary Space: O(n)
+     - Auxiliary Space: O(n) for the sorted `items` list
 
 2. Fractional-Knapsack Upper-Bound Calculation (`upper(depth, cost, score)`):
    Computes the continuous relaxation upper bound by greedily filling remaining budget
-   capacity `room = budget - cost` from `items[depth:]` and rounding the final fractional
-   slice UP to the nearest integer hundredth:
+   capacity `room = budget - cost` using index-based iteration `for j in range(depth, n_items):`
+   and direct element access `items[j]` (avoiding `items[depth:]` list slicing), rounding the
+   final fractional slice UP to the nearest integer hundredth:
      `bound += (value * room + price - 1) // price`
    Stops immediately if `value <= 0` because remaining items have non-positive density.
      - Time Complexity per Call: O(n - depth) = O(n) worst case
-     - Auxiliary Space: O(1)
+     - Temporary Auxiliary Space per Call: O(1) (no list slice allocation)
 
 3. Child-Node Generation (`include` then `exclude`):
    Each expanded internal node at `depth < n` generates two children (`take=True`, `take=False`).
    The `include` child copies and extends the immutable tuple `node.chosen + (original,)` of
-   length <= depth <= n in O(n) time, while `exclude` reuses `node.chosen` in O(1) time;
-   both invoke `upper(depth + 1, ...)` in O(n) time:
+   length <= depth <= n in O(n) time and space, while `exclude` reuses `node.chosen` in O(1);
+   both invoke `upper(depth + 1, ...)` in O(n) time and O(1) auxiliary space:
      - Time Complexity per Expanded Node: O(n)
 
 4. Feasibility Checking, Selected-Index Sorting & Pruning per Explored Node:
-   - Budget feasibility check (`node.cost > budget`): O(1) integer comparison per explored node.
-     Infeasible nodes are immediately pruned (`infeasible_pruned += 1`, `status = 'pruned_budget'`).
+   - Budget feasibility check (`node.cost > budget`): O(1) integer comparison when a node is
+     popped from the frontier. Infeasible nodes are immediately pruned (`infeasible_pruned += 1`,
+     `status = 'pruned_budget'`) before index sorting or expansion.
    - Selected-index sorting (`indices = tuple(sorted(node.chosen))`): Executed for every
      budget-feasible explored node (`node.cost <= budget`) because `node.chosen` accumulates
      original item indices in profit-density order rather than ascending index order. Sorting
-     up to `depth <= n` indices takes O(n log n) time in the worst case, followed by O(n)
-     tuple comparison for canonical tie-breaking `(-score, cost, indices)`.
+     up to `depth <= n` indices takes O(d log d) <= O(n log n) time and O(d) <= O(n) temporary
+     space, followed by O(n) tuple comparison for canonical tie-breaking `(-score, cost, indices)`.
    - Upper-bound pruning check (`node.bound < best_score`): O(1) integer comparison.
      Uses strict inequality (`<`) so equal-bound nodes (`node.bound == best_score`) remain
      searchable to guarantee canonical tie-breaking (lowest cost, then lexicographically
      first original indices).
 
-5. Frontier Operations & Overall Time Complexity (FIFO vs. LC):
+5. Execution Flow in Best, Average, and Worst Cases (FIFO vs. LC):
+   - Actual Execution Flow for Root, Zero-Budget, and No-Fit Cases:
+       * Root Processing: At `depth = 0`, `root` has `cost = 0 <= budget`, `score = 0`, and
+         `bound = upper(0, 0, 0) >= 0`. Initially `best_score = 0`. Because bound pruning uses
+         strict inequality (`node.bound < best_score`), `root.bound < 0` is False. Thus `root`
+         stops immediately ONLY when `n == 0` (`root.depth == len(items) == 0`, k = 1).
+       * When `budget == 0` (for n >= 1 items with `price > 0`): `best_score` remains 0. Along
+         the exclusion spine (`cost = 0, score = 0` at `depth = 0..n`), `room = 0`, so
+         `upper(depth, 0, 0) = 0`. Since `0 < 0` is False, every exclusion node at `depth = 0..n-1`
+         is expanded (`expanded = n`), generating `n` infeasible `include` children (each pushed
+         with `bound = -10^30` and rejected when popped via `node.cost > budget`, giving
+         `infeasible_pruned = n`) and `n` `exclude` children down to the leaf at `depth = n`.
+         Total nodes: `generated = visited = 2n + 1 = Theta(n)`, taking `O(n log n + n^2) = O(n^2)`
+         time because `node.chosen = ()` is empty on all feasible nodes.
+       * When `budget > 0` but No Item Fits (`price > budget` for all n >= 1 items): `best_score`
+         remains 0. Along the exclusion spine (`cost = 0, score = 0`), any remaining item with
+         `value > 0` contributes a positive fractional ceiling `bound > 0` (or `bound = 0` if
+         `value <= 0`), so `node.bound < best_score (0)` is False at every `depth = 0..n-1`.
+         The solver expands all `n` exclusion nodes, pushes and rejects `n` infeasible `include`
+         children when popped, and reaches the exclusion leaf at `depth = n`, visiting
+         `generated = visited = 2n + 1 = Theta(n)` nodes in `O(n^2)` time.
+       * General Best Case for n >= 1 (`k = Theta(n)`): Because any node holding the current
+         `best_score` has `bound >= score == best_score`, its incumbent path is never bound-pruned
+         before reaching `depth = n`. Thus every uncapped run on `n >= 1` items expands at least
+         `n` nodes (`k >= 2n + 1 = Theta(n)`). When strong pruning eliminates all off-path
+         subtrees and feasible nodes along the principal path accumulate up to `O(n)` items,
+         per-node index sorting (`O(n log n)`) across `k = Theta(n)` nodes yields `O(n^2 log n)`
+         best-case time for both FIFO and LC.
    - FIFO Branch and Bound (`collections.deque`):
        * Queue Enqueue (`append`) and Dequeue (`popleft`): O(1) amortized per node.
-       * Per-Node Processing Cost: O(n log n) worst case (dominated by `tuple(sorted(node.chosen))`
-         plus O(n) upper-bound calculation and tuple copying).
-       * Parameterized Search Time (for k nodes): O(k n log n).
-       * Combined Time Complexity: O(n log n + k n log n) = O(k n log n).
-       * Best-Case Time: O(n log n) when search prunes immediately at the root (k = Theta(1)),
-         or O(n^2 log n) when strong pruning explores only a single principal root-to-leaf path
-         of k = Theta(n) nodes.
+       * Combined Parameterized Time Complexity: O(n log n + k n log n).
+       * Best-Case Time: O(n^2 log n) along a single principal path of k = Theta(n) nodes with
+         selected items (O(n^2) when no items are selected across k = 2n + 1 nodes; O(1) only
+         when n = 0).
        * Average-Case Time (input-dependent expected nodes E[k_FIFO]):
          O(n log n + E[k_FIFO] * n log n).
        * Worst-Case Time (ineffective pruning, k = Theta(2^n)):
          O(2^n * n log n).
    - Least Cost (LC) Branch and Bound (`heapq` binary min-heap on `(-node.bound, node.id, node)`):
        * Priority Queue Insert (`heappush`) and Extract-Min (`heappop`): O(log m) <= O(log k)
-         per node, where m <= k is the live heap size. Priority ties on `-node.bound` are broken
-         in O(1) by monotonic creation order `node.id`.
-       * Per-Node Processing Cost: O(n log n + log m) <= O(n log n + log k).
+         per node, where m <= k is the live heap size.
        * Combined Parameterized Time Complexity:
          O(n log n + k(n log n + log k))  [or O(n log n + k(n log n + log m))].
-       * Best-Case Time: O(n log n) for immediate root resolution (k = Theta(1)), or
-         O(n log n + n(n log n + log n)) = O(n^2 log n) when strong pruning dives directly
-         along k = Theta(n) nodes.
+       * Best-Case Time: O(n log n + n(n log n + log n)) = O(n^2 log n) for k = Theta(n) nodes
+         (O(n^2) when no items fit across k = 2n + 1 nodes; O(1) only when n = 0).
        * Average-Case Time (input-dependent expected nodes E[k_LC]):
          O(n log n + E[k_LC] * (n log n + log E[k_LC])).
        * Worst-Case Time (k = Theta(2^n), where log_2(k) = Theta(n) <= n log n):
          O(2^n * (n log n + n)) = O(2^n * n log n).
 
-6. Space Complexity Analysis:
-   - 1. Number of Stored Search Nodes: At most m_max (`max_queue_size`) live nodes in the
-        frontier (O(m_max) <= O(k), worst-case O(2^n) nodes in an uncapped tree).
-   - 2. Memory per Search Node: Each `Node` instance stores scalar attributes in O(1) plus
-        `chosen: tuple[int, ...]` of length <= depth <= n, requiring O(n) space per node
-        in the worst case.
-   - 3. Maximum Search-Frontier Space: O(n * m_max) <= O(n * k) memory (worst-case O(n * 2^n)
-        for O(2^n) frontier nodes each holding up to O(n) chosen indices).
-   - 4. Total Algorithm Space: O(n + n * m_max + k_exp) <= O(n * k) (worst-case O(n * 2^n)),
-        comprising the O(n) sorted item array, O(n) incumbent index tuple, O(n * m_max) live
-        frontier, O(min(k_gen, 30)) = O(1) visualization `trace` dictionary, and O(k_exp)
-        sampled `SearchFrame` progress snapshots.
+6. Space Complexity Analysis (5-Part Distinction):
+   - 1. Search-Frontier Size: At most m_max (`max_queue_size`) live nodes in the FIFO `deque`
+        or LC `heap` simultaneously (O(m_max) <= O(k), worst-case O(2^n) nodes).
+   - 2. Total Stored Search Nodes & Replay Records: O(m_max) live frontier nodes, plus at most
+        30 `TraceNode` entries in `trace` (O(min(k_gen, 30)) = O(1)), plus O(k_exp) sampled
+        scalar `SearchFrame` snapshots in `progress`.
+   - 3. Memory Used per Node: Each `Node` instance (`slots=True`) uses O(1) scalar fields plus
+        its selected-index tuple of length <= depth <= n, taking O(n) worst-case space per node
+        (so maximum frontier memory is O(n * m_max) <= O(n * k), worst-case O(n * 2^n)).
+   - 4. Selected-Index Representation: Immutable tuple `chosen: tuple[int, ...]` of 0-based
+        original item indices (`len(chosen) <= depth <= n`). `include` children allocate a new
+        tuple `node.chosen + (original,)` in O(n) space; `exclude` children reuse the parent
+        tuple reference in O(1) space.
+   - 5. Temporary Auxiliary Allocations: O(n) for the sorted `items` list, O(1) auxiliary
+        space inside `upper()` via index-based loop `range(depth, n_items)`, and O(n) temporary
+        space for `indices = tuple(sorted(node.chosen))` per feasible explored node.
 """
 from collections import deque
 from dataclasses import dataclass
@@ -139,13 +192,19 @@ def solve(request: SolveRequest, strategy: str, on_progress=None) -> SolverResul
     items = [(idx, int(i.cost * 100), int(i.score * 100)) for idx, i in enumerate(request.items)]
     # Step 1: O(n log n) exact rational sort by descending score/cost ratio, tie-broken by original index
     items.sort(key=lambda i: (-Fraction(i[2], i[1]), i[0]))
+    n_items = len(items)
 
-    def upper(depth, cost, score):
-        """O(n - depth) fractional-knapsack continuous relaxation upper bound."""
+    def upper(depth: int, cost: int, score: int) -> int:
+        """O(n - depth) time, O(1) auxiliary space fractional-knapsack continuous relaxation upper bound.
+
+        Iterates by index over `range(depth, n_items)` and accesses `items[j]` directly
+        rather than slicing `items[depth:]`, avoiding O(n) temporary list allocations.
+        """
         if cost > budget:
             return -(10 ** 30)
         room, bound = budget - cost, score
-        for _, price, value in items[depth:]:
+        for j in range(depth, n_items):
+            _, price, value = items[j]
             if value <= 0:
                 break
             if price <= room:
@@ -210,7 +269,7 @@ def solve(request: SolveRequest, strategy: str, on_progress=None) -> SolverResul
         visited += 1
         status = 'expanded'
         if node.cost > budget:
-            # O(1) feasibility pruning: node exceeds budget
+            # O(1) feasibility pruning: node exceeds budget when popped from frontier
             infeasible_pruned += 1
             status = 'pruned_budget'
         else:
@@ -223,7 +282,7 @@ def solve(request: SolveRequest, strategy: str, on_progress=None) -> SolverResul
                 # O(1) upper-bound pruning: optimistic bound cannot reach incumbent best_score
                 bound_pruned += 1
                 status = 'pruned_bound'
-            elif node.depth == len(items):
+            elif node.depth == n_items:
                 status = 'leaf'
             else:
                 expanded += 1
@@ -266,6 +325,7 @@ def solve(request: SolveRequest, strategy: str, on_progress=None) -> SolverResul
 def solve_pair(request: SolveRequest):
     fifo, lc = solve(request, 'fifo'), solve(request, 'lc')
     def rank(result):
-        indices = tuple(i for i, item in enumerate(request.items) if item.id in result.selected_ids)
+        selected = set(result.selected_ids)
+        indices = tuple(i for i, item in enumerate(request.items) if item.id in selected)
         return (-result.total_score, result.total_cost, indices)
     return fifo, lc, 'fifo' if rank(fifo) <= rank(lc) else 'lc'

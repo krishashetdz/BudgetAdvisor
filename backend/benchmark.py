@@ -168,6 +168,13 @@ def run_benchmark_suite(req: BenchmarkRequest) -> BenchmarkResponse:
     """Execute warm-up and multi-repetition benchmarks across requested dataset sizes."""
     unique_sizes = sorted(set(req.sizes))
 
+    if req.dataset_name and req.dataset_name.strip():
+        resolved_dataset_name = req.dataset_name.strip()
+    elif req.dataset_source == 'custom':
+        resolved_dataset_name = f'Custom {req.mode.title()} Dataset ({len(req.custom_items or [])} base items)'
+    else:
+        resolved_dataset_name = f'Generated {req.mode.title()} Benchmark Pool (Seed {req.seed})'
+
     # Perform warm-up run on a small 5-item instance to eliminate cold-start jitter
     warmup_items, warmup_budget = generate_benchmark_dataset(req.mode, min(5, unique_sizes[0]), req.seed)
     warmup_req = SolveRequest(
@@ -256,8 +263,10 @@ def run_benchmark_suite(req: BenchmarkRequest) -> BenchmarkResponse:
         )
 
     return BenchmarkResponse(
+        dataset_name=resolved_dataset_name,
         mode=req.mode,
         dataset_source=req.dataset_source,
+        seed=req.seed,
         repetitions=req.repetitions,
         warmup_performed=True,
         generated_at=datetime.now(timezone.utc).isoformat(),

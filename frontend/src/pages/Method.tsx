@@ -27,28 +27,28 @@ const rules = [
   },
   {
     icon: Calculator,
-    title: 'One shared upper bound',
-    text: 'Items are sorted by score/cost ratio, descending; original row order breaks ratio ties. The fractional-knapsack relaxation fills remaining capacity with positive-score items. Costs and scores use integer hundredths; the last fractional score is rounded upward, never downward.',
+    title: 'One shared upper bound (O(1) auxiliary space)',
+    text: 'Items are sorted by score/cost ratio, descending; original row order breaks ratio ties. The fractional-knapsack relaxation iterates by index over remaining items (for j in range(depth, len(items)): items[j]) without allocating a list slice, filling remaining capacity with positive-score items and rounding the final fractional score upward in integer hundredths.',
   },
   {
     icon: Equal,
     title: 'Deterministic ties',
-    text: 'Maximize total score, then minimize cost, then choose the lexicographically first tuple of original item indices. Equal-bound nodes remain searchable. Both strategies use include-then-exclude children; priority ties use creation order.',
+    text: 'Maximize total score, then minimize cost, then choose the lexicographically first tuple of original item indices. Equal-bound nodes (node.bound == best_score) remain searchable via strict inequality (node.bound < best_score). Both strategies generate include-then-exclude children; LC priority ties use monotonic creation order (node.id).',
   },
   {
     icon: ListOrdered,
-    title: 'Generated vs. explored (visited) nodes',
-    text: 'A node is generated when created and pushed into the frontier, and explored (visited) only when popped from the frontier—including nodes then pruned for exceeding the budget or falling below the incumbent score. Because each expanded node generates two children (include and exclude), total generated nodes (1 + 2 × expanded) can exceed explored nodes by the number of nodes remaining in the frontier.',
+    title: 'Generated vs. explored (visited) vs. pruned nodes',
+    text: 'A node is generated when constructed and pushed into the frontier (root + 2 children per expanded node, including infeasible include children), and explored (visited) only when popped from the frontier. Budget-infeasible (cost > budget) and bound-dominated (bound < best_score) nodes are counted as generated when pushed and as visited + pruned when popped. Thus generated = 1 + 2 × expanded = visited + frontier_remaining holds at every step.',
   },
   {
     icon: ShieldCheck,
     title: 'A result, with a proof',
-    text: 'The first feasible solution is not the stopping condition. A search proves optimality only after its frontier is exhausted (frontier_remaining == 0). A no-fit, zero-budget, or empty-list case still processes the root and reports actual work; spending is zero and the full budget remains.',
+    text: 'The first feasible solution is not the stopping condition. A search proves optimality only after its frontier is exhausted (frontier_remaining == 0). For n ≥ 1 items, a zero-budget or no-fit case still expands the n-level exclusion path and pops the n infeasible include children (2n + 1 nodes total); spending is zero and the full budget remains.',
   },
   {
     icon: Timer,
     title: 'Bounded explored work, honest status',
-    text: 'The configured search node limit (max_nodes ≤ 50,000) caps explored (visited) nodes—not generated nodes—alongside a 1.5-second time limit and at most 24 input items. Because each expanded node creates 2 children, generated nodes can reach up to 2 × visited + 1. DP is limited to 50,000 retained states, 200,000 state evaluations, and 1.5 seconds. Capped methods report best found, not proven optimal.',
+    text: 'The configured search node limit (max_nodes ≤ 50,000) caps explored (visited) nodes—not generated nodes—alongside a 1,500 ms execution timeout and at most 24 input items. Because each expanded node creates 2 children, generated nodes can legitimately reach up to 2 × visited + 1 ≤ 100,001. DP is limited to 50,000 retained states, 200,000 state evaluations, and 1,500 ms. Capped runs report best found, not proven optimal.',
   },
   {
     icon: GitBranch,
@@ -66,21 +66,21 @@ const stepComplexities = [
   },
   {
     step: '2. Fractional-Knapsack Upper-Bound Calculation',
-    complexity: 'O(n − depth) = O(n) time per node · O(1) space',
+    complexity: 'O(n − depth) = O(n) time · O(1) aux space',
     detail:
-      'Starting at the current tree depth, greedily adds remaining positive-score items that fit completely in remaining capacity (room = budget − cost) and takes the integer-hundredths ceiling ⌈(vⱼ × room) / cⱼ⌉ of the first item that exceeds room.',
+      'Iterates by index (for j in range(depth, len(items)): items[j]) without slicing items[depth:], greedily adding positive-score items that fit in room = budget − cost and taking the integer-hundredths ceiling ⌈(vⱼ × room) / cⱼ⌉ of the first item exceeding room.',
   },
   {
     step: '3. Child-Node Generation',
     complexity: 'O(n) time per expanded node',
     detail:
-      'Each non-leaf feasible node at depth d < n creates two child nodes: the include child (x_d = 1) copies and extends the immutable tuple node.chosen + (original,) in O(d) ⊆ O(n) time, while the exclude child (x_d = 0) reuses node.chosen in O(1); both compute upper(d + 1, ...) in O(n).',
+      'Each non-leaf feasible node at depth d < n with node.bound ≥ best_score expands two children: include (x_d = 1) copies node.chosen + (original,) in O(d) ⊆ O(n) time, while exclude (x_d = 0) reuses node.chosen in O(1); both call upper(d + 1, ...) in O(n) time and are pushed into the frontier.',
   },
   {
     step: '4. Feasibility Checking',
     complexity: 'O(1) time per explored node',
     detail:
-      'When a node is popped from the frontier, checking node.cost > budget requires a single integer comparison. Budget-infeasible nodes increment infeasible_pruned (pruned_budget) and are discarded immediately before index sorting or expansion.',
+      'When a node is popped (visited) from the frontier, checking node.cost > budget takes O(1) time. Infeasible include nodes pushed during parent expansion increment infeasible_pruned (pruned_budget) upon pop and are discarded before index sorting or child expansion.',
   },
   {
     step: '5. Selected-Index Sorting & Tie-Break Check',
@@ -104,7 +104,7 @@ const stepComplexities = [
     step: '8. Branch Pruning & Trace Management',
     complexity: 'O(1) bound test · O(min(k, 30)) trace space',
     detail:
-      'Compares node.bound < best_score in O(1) time (preserving node.bound == best_score for canonical tie-breaking), updates max_queue_size in O(1), and stores at most 30 ancestor-closed TraceNode records in O(1) bounded memory.',
+      'Compares node.bound < best_score in O(1) time (strict < keeps node.bound == best_score searchable for canonical tie-breaking), updates max_queue_size in O(1), and stores at most 30 ancestor-closed TraceNode records in O(1) bounded memory.',
   },
 ];
 
@@ -194,7 +194,7 @@ export default function Method() {
             <div>
               <strong>Search Nodes (k) &amp; Live Frontier (m)</strong>
               <p>
-                k denotes explored/generated tree nodes (1 ≤ k ≤ 2ⁿ⁺¹ − 1; explored nodes capped at max_nodes ≤ 50,000, generated nodes up to 2·visited + 1). m ≤ k is the live queue/heap size.
+                k denotes generated/explored tree nodes (for n ≥ 1, 2n + 1 ≤ k ≤ 2ⁿ⁺¹ − 1 when uncapped; explored nodes capped at max_nodes ≤ 50,000, generated nodes up to 2·visited + 1). m ≤ k is the live queue/heap size.
               </p>
             </div>
           </div>
@@ -228,23 +228,23 @@ export default function Method() {
           <article className="theory-case-card" data-testid="best-case-analysis">
             <div className="theory-case-header">
               <TrendingUp size={17} />
-              <h3>Best-Case Complexity</h3>
+              <h3>Best-Case Complexity &amp; Execution Flow</h3>
             </div>
             <p>
-              <strong>When strong pruning limits the search:</strong> Even in the best case, the algorithm never runs in <code>O(1)</code> constant time because preprocessing always converts and sorts all <code>n</code> items by rational density <code>vᵢ / cᵢ</code> in <code>O(n log n)</code> time and computes the root bound in <code>O(n)</code> time.
+              <strong>Why the search does not stop at the root for n ≥ 1:</strong> Preprocessing always converts and sorts all <code>n</code> items by rational density <code>vᵢ / cᵢ</code> in <code>O(n log n)</code> time and evaluates <code>upper(0, 0, 0)</code> in <code>O(n)</code> time. Only when <code>n == 0</code> (empty dataset) is the root already at <code>depth == len(items)</code>, terminating at <code>k = 1</code>. For any <code>n ≥ 1</code>:
             </p>
             <ul>
               <li>
-                <strong>Immediate Root Resolution (k = Θ(1)):</strong> If <code>budget == 0</code> or no items fit, only the root/depth-1 nodes are checked, so preprocessing dominates at <code>O(n log n)</code>.
+                <strong>Root Processing &amp; Strict Bound Inequality:</strong> The root (<code>depth = 0, cost = 0, score = 0</code>) is popped with <code>best_score = 0</code> and <code>root.bound ≥ 0</code>. Because bound pruning uses strict inequality (<code>node.bound &lt; best_score</code>) to preserve equal-bound ties, <code>root.bound &lt; 0</code> is <code>False</code> and the root is expanded.
               </li>
               <li>
-                <strong>Strong Pruning Along One Principal Path (k = Θ(n)):</strong> When a high-density feasible path immediately tightens <code>best_score</code> and prunes all sibling subtrees via <code>node.bound &lt; best_score</code>, only <code>k = Θ(n)</code> nodes are explored.
+                <strong>Child Generation &amp; When Infeasible Nodes Are Rejected:</strong> Expanding any node at <code>depth &lt; n</code> pushes both an <code>include</code> child and an <code>exclude</code> child into the frontier. Budget feasibility (<code>node.cost &gt; budget</code>) is checked <em>when a child is popped</em> from the frontier—not before pushing—so infeasible <code>include</code> children are generated, pushed (with <code>bound = −10³⁰</code>), and rejected in <code>O(1)</code> upon pop (<code>infeasible_pruned += 1</code>).
               </li>
               <li>
-                <strong>Per-Node Cost on That Path:</strong> Each feasible explored node computes <code>upper()</code> in <code>O(n)</code> and sorts its chosen original indices via <code>tuple(sorted(node.chosen))</code> in <code>O(n log n)</code> (plus <code>O(1)</code> deque ops in FIFO or <code>O(log n)</code> heap ops in LC).
+                <strong>What Happens When <code>budget == 0</code> or No Item Fits:</strong> Since no item is affordable, <code>best_score</code> stays <code>0</code>. Along the exclusion path (<code>cost = 0, score = 0</code> at <code>depth = 0…n − 1</code>), <code>upper(depth, 0, 0)</code> returns <code>0</code> when <code>budget == 0</code> or a positive fractional slice <code>&gt; 0</code> when <code>0 &lt; budget &lt; min_cost</code>. Thus <code>node.bound &lt; best_score (0)</code> is <code>False</code> at every exclusion level: all <code>n</code> exclusion nodes expand, pushing <code>n</code> infeasible <code>include</code> children (each rejected on pop) and <code>n</code> <code>exclude</code> children down to the <code>depth = n</code> leaf, exploring <code>k = 2n + 1 = Θ(n)</code> nodes in <code>O(n log n + n²) = O(n²)</code> time.
               </li>
               <li>
-                <strong>Resulting Best-Case Time:</strong> <code>O(n log n + n · n log n) = O(n² log n)</code> along a single root-to-leaf path (or <code>O(n log n)</code> when resolved at the root).
+                <strong>How <code>best_score</code> Affects Pruning &amp; General Best Case (<code>k = Θ(n)</code>):</strong> Any node holding the current incumbent has <code>node.bound ≥ node.score == best_score</code>, so the incumbent path is never bound-pruned before reaching <code>depth = n</code> (<code>k ≥ 2n + 1</code>). When a high-density feasible path tightens <code>best_score</code> and prunes all off-path sibling subtrees via <code>node.bound &lt; best_score</code>, only <code>k = Θ(n)</code> nodes are explored. With <code>O(n)</code> bounding and <code>O(n log n)</code> selected-index sorting (<code>tuple(sorted(node.chosen))</code>) per feasible node, the conservative best-case time is <code>O(n log n + n · n log n) = O(n² log n)</code> for both FIFO and LC.
               </li>
             </ul>
           </article>
@@ -314,23 +314,26 @@ export default function Method() {
           <article className="theory-case-card" data-testid="space-distinction-analysis">
             <div className="theory-case-header">
               <Database size={17} />
-              <h3>Space Complexity Analysis (4-Part Distinction)</h3>
+              <h3>Space Complexity Analysis (5-Part Distinction)</h3>
             </div>
             <p>
-              Because each search node stores its selected item indices rather than just a scalar value, we distinguish four memory quantities rather than reporting a bare <code>O(2ⁿ)</code>:
+              Because each search node stores its selected item indices rather than just a scalar value, we distinguish five memory quantities in the actual implementation:
             </p>
             <ul>
               <li>
-                <strong>1. Number of Search Nodes Stored:</strong> At most <code>m_max</code> (reported as <code>max_queue_size</code>) live nodes reside simultaneously in FIFO’s <code>deque</code> or LC’s <code>heapq</code>, which is <code>O(m_max) ⊆ O(k)</code> and <code>O(2ⁿ)</code> nodes in the uncapped worst case.
+                <strong>1. Search-Frontier Size (<code>m</code> &amp; <code>m_max</code>):</strong> At most <code>m_max</code> (reported as <code>max_queue_size</code>) live unexpanded nodes reside simultaneously in FIFO’s <code>deque</code> or LC’s <code>heapq</code>, which is <code>O(m_max) ⊆ O(k)</code> and <code>O(2ⁿ)</code> nodes in the uncapped worst case.
               </li>
               <li>
-                <strong>2. Memory Used by Each Search Node:</strong> Each <code>Node</code> object (with <code>slots=True</code>) holds scalar fields (<code>id</code>, <code>parent</code>, <code>depth</code>, <code>cost</code>, <code>score</code>, <code>bound</code>, <code>decision</code>) in <code>O(1)</code> plus the immutable tuple <code>node.chosen</code> of up to <code>depth ≤ n</code> indices, taking <code>O(n)</code> memory per node in the worst case.
+                <strong>2. Total Stored Search Nodes &amp; Replay Records:</strong> Comprises the <code>O(m_max)</code> live frontier nodes, at most <code>30</code> ancestor-closed <code>TraceNode</code> entries in <code>trace</code> (<code>O(min(k_gen, 30)) = O(1)</code>), and <code>O(k_exp)</code> sampled scalar <code>SearchFrame</code> snapshots in <code>progress</code>.
               </li>
               <li>
-                <strong>3. Maximum Search-Frontier Space:</strong> Combining <code>m_max</code> live frontier nodes with up to <code>O(n)</code> indices per node gives <code>O(n · m_max) ⊆ O(n · k)</code> frontier memory, or <code>O(n · 2ⁿ)</code> in the theoretical worst case.
+                <strong>3. Memory Used per Search Node:</strong> Each <code>Node</code> object (with <code>slots=True</code>) holds 7 scalar fields in <code>O(1)</code> plus its selected-index tuple of length <code>≤ depth ≤ n</code>, requiring <code>O(n)</code> worst-case memory per node and <code>O(n · m_max) ⊆ O(n · k)</code> (worst-case <code>O(n · 2ⁿ)</code>) maximum frontier memory.
               </li>
               <li>
-                <strong>4. Total Algorithm Space:</strong> Includes the <code>O(n)</code> sorted item list, <code>O(n)</code> incumbent tuple <code>best_indices</code>, <code>O(n · m_max)</code> live frontier, <code>O(min(k, 30)) = O(1)</code> visualization <code>trace</code> map, and <code>O(k_exp)</code> sampled progress frames—totaling <code>O(n + n · m_max + k_exp) ⊆ O(n · k)</code> (worst-case <code>O(n · 2ⁿ)</code> for B&amp;B; <code>O(n · S)</code> for Sparse DP).
+                <strong>4. Selected-Index Representation (<code>node.chosen</code>):</strong> Stored as an immutable tuple <code>tuple[int, ...]</code> of 0-based original item indices (plus <code>best_indices</code> in <code>O(n)</code>). An <code>include</code> child allocates a new tuple <code>node.chosen + (original,)</code> in <code>O(n)</code> space, whereas an <code>exclude</code> child reuses the parent’s tuple reference in <code>O(1)</code> space.
+              </li>
+              <li>
+                <strong>5. Temporary Auxiliary Allocations:</strong> Preprocessing allocates the <code>O(n)</code> sorted <code>items</code> list; <code>upper(depth, cost, score)</code> iterates by index <code>for j in range(depth, len(items))</code> with direct element access <code>items[j]</code> in <strong><code>O(1)</code> auxiliary space</strong> (avoiding <code>items[depth:]</code> slice copies); and each feasible explored node allocates a temporary sorted tuple <code>indices = tuple(sorted(node.chosen))</code> in <code>O(n)</code> space.
               </li>
             </ul>
           </article>
@@ -340,26 +343,29 @@ export default function Method() {
           <article className="theory-case-card" data-testid="node-terminology-distinction">
             <div className="theory-case-header">
               <ListOrdered size={17} />
-              <h3>Node Counters &amp; Search-Limit Semantics</h3>
+              <h3>Node Counters &amp; Search-Limit Semantics (1–6)</h3>
             </div>
             <p>
-              The solver, API responses, benchmark tables, and reports maintain five distinct node-accounting metrics:
+              The solver, API responses, benchmark tables, and reports maintain six consistent node-accounting and limit definitions:
             </p>
             <ul>
               <li>
-                <strong>Nodes Generated (<code>generated</code> / <code>nodes_generated</code>):</strong> Every node constructed and pushed into the frontier (root + 2 children per expanded node, so <code>generated = 1 + 2 × expanded</code>).
+                <strong>1. Generated Nodes (<code>generated</code> / <code>nodes_generated</code>):</strong> Every node constructed and pushed into the frontier via <code>push(node)</code> (root + 2 children per expanded node, so <code>generated = 1 + 2 × expanded</code>). Both children—even an <code>include</code> child exceeding the budget—are pushed and counted as generated.
               </li>
               <li>
-                <strong>Nodes Explored / Visited (<code>visited</code> / <code>nodes_explored</code>):</strong> Every node popped from the frontier and evaluated during the search loop.
+                <strong>2. Explored / Visited Nodes (<code>visited</code> / <code>nodes_explored</code>):</strong> Every node popped from the frontier and evaluated in the search loop (<code>visited = expanded + pruned + leaf_visited</code>).
               </li>
               <li>
-                <strong>Nodes Pruned (<code>pruned</code> / <code>nodes_pruned</code>):</strong> Explored nodes discarded without expansion, equal to <code>infeasible_pruned (cost &gt; budget) + bound_pruned (bound &lt; best_score)</code>.
+                <strong>3. Pruned Nodes (<code>pruned</code> / <code>nodes_pruned</code>):</strong> Explored (popped) nodes discarded without expansion: <code>pruned = infeasible_pruned (cost &gt; budget) + bound_pruned (bound &lt; best_score)</code>. Unpopped children still in the frontier when a limit is hit are counted in <code>frontier_remaining</code>, not in <code>visited</code> or <code>pruned</code>.
               </li>
               <li>
-                <strong>Nodes Remaining in Frontier (<code>frontier_remaining</code>):</strong> Live nodes still waiting in the queue or min-heap when the search ends (<code>generated − visited</code>). Optimality is proven if and only if <code>frontier_remaining == 0</code>.
+                <strong>4. Nodes Remaining in Frontier (<code>frontier_remaining</code>):</strong> Live unpopped nodes still in the queue or min-heap at termination (satisfying <code>generated = visited + frontier_remaining</code>). Optimality is proven if and only if <code>frontier_remaining == 0</code>.
               </li>
               <li>
-                <strong>Configured Search Node Limit (<code>max_nodes</code>, default 50,000):</strong> Enforced via <code>if visited &gt;= request.max_nodes: break</code>, capping <strong>explored (visited)</strong> nodes. Because each expanded node generates 2 children, <code>generated</code> can legitimately exceed <code>max_nodes</code> (up to <code>2 × visited + 1 ≤ 100,001</code>).
+                <strong>5. Configured Search-Node Limit (<code>max_nodes</code>, default 50,000):</strong> Enforced via <code>if visited &gt;= request.max_nodes: stop_reason = &apos;node_limit&apos;; break</code>, capping <strong>explored (visited)</strong> nodes. Because each expanded node generates 2 children, <code>generated</code> can legitimately exceed <code>max_nodes</code> (up to <code>2 × visited + 1 ≤ 100,001</code>).
+              </li>
+              <li>
+                <strong>6. Execution Timeout (<code>time_limit_ms</code>, default 1,500 ms):</strong> Enforced via <code>if (perf_counter() − start) × 1000 &gt;= request.time_limit_ms: stop_reason = &apos;time_limit&apos;; break</code>. Any run stopped by <code>node_limit</code> or <code>time_limit</code> with <code>frontier_remaining &gt; 0</code> sets <code>proven_optimal = False</code>.
               </li>
             </ul>
           </article>
@@ -383,7 +389,7 @@ export default function Method() {
                 <strong>Best-First Guided Diving in LC:</strong> LC’s min-heap on <code>−node.bound</code> immediately follows the most promising branch to a leaf rather than sweeping across all shallow breadth-first levels.
               </li>
               <li>
-                <strong>Small Per-Node Constants for n ≤ 24:</strong> At depth <code>d ≤ 24</code>, sorting or copying a tuple of at most 24 integers in CPython takes sub-microsecond C-array operations, and budget-infeasible nodes are rejected in <code>O(1)</code> before <code>tuple(sorted(node.chosen))</code> is ever called.
+                <strong>Small Per-Node Constants &amp; Zero-Slice Bounding for n ≤ 24:</strong> At depth <code>d ≤ 24</code>, index-based bounding avoids list slicing, sorting a tuple of at most 24 integers in CPython takes sub-microsecond C-array operations, and budget-infeasible nodes are rejected in <code>O(1)</code> before <code>tuple(sorted(node.chosen))</code> is ever called.
               </li>
             </ul>
           </article>
@@ -422,8 +428,8 @@ export default function Method() {
                 </tr>
                 <tr>
                   <td><strong>Upper-Bound Calculation</strong></td>
-                  <td><code>O(n − depth) = O(n)</code> fractional relaxation</td>
-                  <td><code>O(n − depth) = O(n)</code> fractional relaxation</td>
+                  <td><code>O(n − depth) = O(n)</code> time · <code>O(1)</code> aux space</td>
+                  <td><code>O(n − depth) = O(n)</code> time · <code>O(1)</code> aux space</td>
                   <td>Not applicable (exact state transitions)</td>
                 </tr>
                 <tr>
@@ -445,10 +451,10 @@ export default function Method() {
                   <td><code>O(Σᵢ (i + 1) Sᵢ) = O(n · S_total) ⊆ O(n² S)</code></td>
                 </tr>
                 <tr>
-                  <td><strong>Best-Case Time</strong></td>
-                  <td><code>O(n log n)</code> (root) · <code>O(n² log n)</code> (<code>k = Θ(n)</code> path)</td>
-                  <td><code>O(n log n)</code> (root) · <code>O(n² log n)</code> (<code>k = Θ(n)</code> dive)</td>
-                  <td><code>O(n · S_min)</code> (when few cost sums fit)</td>
+                  <td><strong>Best-Case Time (n ≥ 1, k = Θ(n))</strong></td>
+                  <td><code>O(n² log n)</code> (1 path) · <code>O(n²)</code> (no-fit/B=0)</td>
+                  <td><code>O(n² log n)</code> (1 dive) · <code>O(n²)</code> (no-fit/B=0)</td>
+                  <td><code>O(n · S_min)</code> (<code>O(n)</code> when <code>S_min = 1</code>)</td>
                 </tr>
                 <tr>
                   <td><strong>Average-Case Time</strong></td>

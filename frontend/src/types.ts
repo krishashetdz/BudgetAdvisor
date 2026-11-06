@@ -28,6 +28,7 @@ export interface Run {
 
 // Feature 1: Performance Benchmarking types
 export interface BenchmarkRequestPayload {
+  dataset_name?: string;
   mode: Mode;
   dataset_source: 'generated' | 'custom';
   sizes: number[];
@@ -82,8 +83,10 @@ export interface BenchmarkRow {
 }
 
 export interface BenchmarkResponse {
+  dataset_name?: string;
   mode: Mode;
   dataset_source: 'generated' | 'custom';
+  seed?: number;
   repetitions: number;
   warmup_performed: boolean;
   generated_at: string;
@@ -152,6 +155,8 @@ export interface SensitivityResponse {
 // Feature 3: Report Export types
 export interface ReportExportRequestPayload {
   dataset_name: string;
+  run_id?: string;
+  dataset_source?: 'custom' | 'generated';
   mode: Mode;
   items: Item[];
   budget: string;
@@ -162,7 +167,10 @@ export interface ReportExportRequestPayload {
   sensitivity_max_budget?: string;
   sensitivity_intervals?: number;
   include_benchmark?: boolean;
+  benchmark_dataset_source?: 'custom' | 'generated';
   benchmark_sizes?: number[];
+  benchmark_repetitions?: number;
+  benchmark_seed?: number;
 }
 
 export const money = (n: number) => '₹' + n.toLocaleString('en-IN', { maximumFractionDigits: 2 });

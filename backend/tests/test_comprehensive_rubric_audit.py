@@ -2,21 +2,24 @@
 
 Covers all Professor Mini-Project Guideline and Final Technical Audit requirements across:
 - Category 1 (Correctness): FIFO queue level-order traversal, LC priority-queue bound ordering,
-  fractional-knapsack upper-bound conservativeness, feasibility checking, branch pruning,
-  DP independent verification, and multi-optimal canonical tie-breaking.
+  fractional-knapsack upper-bound conservativeness (with O(1) auxiliary space index-based iteration),
+  feasibility checking, branch pruning, DP independent verification, and multi-optimal canonical tie-breaking.
 - Category 2 (Robustness): All 18 required edge cases including empty dataset, single item,
-  zero budget, budget < min item, budget == item cost, budget > total cost, item > budget,
-  duplicate item costs, duplicate item values, multiple optimal combinations, negative/invalid costs,
+  zero budget (2n + 1 nodes), budget < min item (2n + 1 nodes), budget == item cost, budget > total cost,
+  item > budget, duplicate item costs, duplicate item values, multiple optimal combinations, negative/invalid costs,
   invalid budgets, missing item attributes, 24-item max datasets, search node limits (visited vs generated),
   execution time limits, invalid API requests, and database unavailability / in-memory fallback.
 - Category 3 & 4 (Regression across UI & Application Logic): Shopping & Investment modes,
   manual selection hundredths & over-budget calculation, search tree & step-by-step replay frames,
-  saved runs lifecycle, Undo/Redo draft history state machine, and PDF/CSV report consistency.
+  saved runs lifecycle, Undo/Redo draft history state machine, and PDF/CSV dataset consistency & mathematical verification.
 """
 from __future__ import annotations
 
+import ast
 import asyncio
+import csv
 from decimal import Decimal
+import inspect
 from itertools import combinations
 import io
 import os
@@ -45,6 +48,7 @@ from report_generator import generate_benchmark_csv, generate_optimization_pdf_r
 from samples import SAMPLES  # noqa: E402
 from sensitivity import run_sensitivity_analysis  # noqa: E402
 from server import _InMemoryClient, _InMemoryCollection, _InMemoryDB  # noqa: E402
+import solver as solver_module  # noqa: E402
 from solver import solve, solve_pair  # noqa: E402
 
 load_dotenv(Path(__file__).resolve().parents[2] / "frontend" / ".env")
@@ -80,8 +84,82 @@ def _exhaustive_knapsack(req: SolveRequest) -> tuple[float, float, list[str]]:
 
 
 # ============================================================================
-# CATEGORY 1: CORRECTNESS AUDIT TESTS
+# CATEGORY 1: CORRECTNESS & UPPER-BOUND MEMORY OPTIMIZATION AUDIT TESTS
 # ============================================================================
+
+def test_upper_bound_index_iteration_no_slice_allocation_and_exact_results():
+    """Verify Issue 1 fix: upper() in backend/solver.py uses index-based iteration (range(depth, n_items))
+    without any list slicing (items[depth:]), while producing identical optimal results for FIFO, LC, and DP."""
+    source_code = inspect.getsource(solver_module.solve)
+    parsed_ast = ast.parse(source_code)
+
+    upper_funcs = [
+        node for node in ast.walk(parsed_ast)
+        if isinstance(node, ast.FunctionDef) and node.name == "upper"
+    ]
+    assert len(upper_funcs) == 1, "Expected exactly one `upper` function in solver.solve"
+    upper_ast = upper_funcs[0]
+
+    # Ensure no `ast.Slice` (such as `items[depth:]`) exists anywhere inside `upper()`
+    slices_in_upper = [node for node in ast.walk(upper_ast) if isinstance(node, ast.Slice)]
+    assert slices_in_upper == [], "upper() must use index-based iteration and must not allocate list slices"
+
+    # Verify index-based `range(depth, ...)` is used inside `upper()`
+    for_loops = [node for node in ast.walk(upper_ast) if isinstance(node, ast.For)]
+    assert len(for_loops) == 1
+    assert isinstance(for_loops[0].iter, ast.Call)
+    assert getattr(for_loops[0].iter.func, "id", "") == "range"
+
+    # Verify FIFO, LC, and DP produce identical optimal results on both seeded datasets
+    for sample in SAMPLES:
+        req = SolveRequest(mode=sample["mode"], items=sample["items"], budget=Decimal(sample["budget"]))
+        fifo, lc, rec = solve_pair(req)
+        dp = solve_dp(req)
+        exp_score, exp_cost, exp_ids = _exhaustive_knapsack(req)
+        assert fifo.total_score == lc.total_score == dp.total_score == exp_score
+        assert fifo.total_cost == lc.total_cost == dp.total_cost == exp_cost
+        assert fifo.selected_ids == lc.selected_ids == dp.selected_ids == exp_ids
+
+
+def test_best_case_execution_flow_zero_budget_and_no_fit_node_counts():
+    """Verify Issue 2 & 3 fix: actual solver execution flow when budget == 0 or no item fits.
+    Only n == 0 stops at the root (k = 1); for any n >= 1, the solver expands all n exclusion
+    nodes and pushes/rejects n infeasible include children (generated == visited == 2*n + 1)."""
+    # 1. Empty dataset (n = 0): stops immediately at root (k = 1)
+    req_empty = SolveRequest(mode="shopping", items=[], budget=Decimal("0.00"))
+    for strat in ("fifo", "lc"):
+        res0 = solve(req_empty, strat)
+        assert res0.generated == 1
+        assert res0.visited == 1
+        assert res0.expanded == 0
+        assert res0.infeasible_pruned == 0
+        assert res0.bound_pruned == 0
+        assert res0.frontier_remaining == 0
+        assert res0.proven_optimal is True
+
+    # 2. Non-empty datasets (n = 1, 4, 8) under budget == 0 and under no-fit (0 < budget < min_cost)
+    for n in (1, 4, 8):
+        items = [
+            {"id": f"item-{k}", "name": f"Item {k}", "cost": Decimal("500.00"), "score": Decimal("50.00")}
+            for k in range(n)
+        ]
+        for b_val in (Decimal("0.00"), Decimal("100.00")):
+            req = SolveRequest(mode="shopping", items=items, budget=b_val)
+            for strat in ("fifo", "lc"):
+                res = solve(req, strat)
+                assert res.selected_ids == []
+                assert res.total_score == 0.0
+                assert res.total_cost == 0.0
+                assert res.remaining_budget == float(b_val)
+                assert res.expanded == n
+                assert res.generated == 2 * n + 1
+                assert res.visited == 2 * n + 1
+                assert res.infeasible_pruned == n
+                assert res.bound_pruned == 0
+                assert res.pruned == n
+                assert res.frontier_remaining == 0
+                assert res.proven_optimal is True
+
 
 def test_fifo_level_order_traversal_and_upper_bound_conservativeness():
     """Verify FIFO explores nodes in non-decreasing tree depth (breadth-first level order)
@@ -377,6 +455,59 @@ def test_pdf_report_with_benchmark_table_and_empty_dataset(api_client):
     assert "No items were selected" in empty_text
 
 
+def test_pdf_and_csv_dataset_consistency_and_mathematical_verification():
+    """Verify Issue 6 & 7: PDF and CSV exports using the same benchmark configuration produce matching
+    deterministic node counts and optimal values, and clearly distinguish custom vs generated sources."""
+    shopping = next(s for s in SAMPLES if s["mode"] == "shopping")
+    items = shopping["items"]
+    budget = Decimal(shopping["budget"])
+
+    # 1. Export PDF and CSV using the exact same Custom dataset configuration (sizes [5, 10, 15, 20], seed=42)
+    pdf_req = ReportExportRequest(
+        dataset_name="Shopping Advisor Dataset",
+        run_id="g12-consistency-check",
+        dataset_source="custom",
+        mode="shopping",
+        items=items,
+        budget=budget,
+        include_sensitivity=True,
+        sensitivity_intervals=6,
+        include_benchmark=True,
+        benchmark_dataset_source="custom",
+        benchmark_sizes=[5, 10, 15, 20],
+        benchmark_repetitions=2,
+        benchmark_seed=42,
+    )
+    pdf_bytes = generate_optimization_pdf_report(pdf_req)
+    reader = pypdf.PdfReader(io.BytesIO(pdf_bytes))
+    assert len(reader.pages) == 2
+    pdf_text = "\n".join(p.extract_text() or "" for p in reader.pages)
+    assert "Source: Custom [Shopping Advisor Dataset]" in pdf_text
+    assert "Seed 42" in pdf_text
+
+    csv_req = BenchmarkRequest(
+        dataset_name="Shopping Advisor Dataset",
+        mode="shopping",
+        dataset_source="custom",
+        sizes=[5, 10, 15, 20],
+        repetitions=2,
+        seed=42,
+        budget=budget,
+        custom_items=items,
+    )
+    bench_res = run_benchmark_suite(csv_req)
+    csv_text = generate_benchmark_csv(bench_res)
+    parsed_csv = list(csv.reader(io.StringIO(csv_text)))
+    assert len(parsed_csv) == 1 + 4 * 2
+
+    # Every row in the CSV must appear with matching deterministic node counts & optimal value in the PDF
+    for brow in bench_res.rows:
+        assert f"{brow.fifo.optimal_value:,.2f}" in pdf_text
+        assert f"{brow.lc.optimal_value:,.2f}" in pdf_text
+        assert f"{brow.fifo.nodes_explored:,}" in pdf_text
+        assert f"{brow.lc.nodes_explored:,}" in pdf_text
+
+
 # ============================================================================
 # CATEGORY 3: SEARCH TREE, REPLAY TIMELINE, AND NODE-ACCOUNTING REGRESSION
 # ============================================================================
@@ -429,5 +560,5 @@ def test_frontend_manual_selection_undo_redo_and_local_solver_suite():
         timeout=30,
     )
     assert res.returncode == 0, f"Frontend test suite failed:\n{res.stdout}\n{res.stderr}"
-    assert "pass 4" in res.stdout
+    assert "pass 5" in res.stdout
     assert "fail 0" in res.stdout

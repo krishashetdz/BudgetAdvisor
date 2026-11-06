@@ -673,8 +673,17 @@ function median(values: number[]): number {
 
 export function runLocalBenchmarkSuite(req: BenchmarkRequestPayload): BenchmarkResponse {
   const uniqueSizes = Array.from(new Set(req.sizes)).sort((a, b) => a - b);
+  const resolvedSeed = req.seed || 42;
+  const modeTitle = req.mode.charAt(0).toUpperCase() + req.mode.slice(1);
+  const resolvedDatasetName =
+    req.dataset_name && req.dataset_name.trim()
+      ? req.dataset_name.trim()
+      : req.dataset_source === 'custom'
+      ? `Custom ${modeTitle} Dataset (${(req.custom_items || []).length} base items)`
+      : `Generated ${modeTitle} Benchmark Pool (Seed ${resolvedSeed})`;
+
   // Warm-up run
-  const warm = generateLocalBenchmarkDataset(req.mode, Math.min(5, uniqueSizes[0] || 5), req.seed || 42);
+  const warm = generateLocalBenchmarkDataset(req.mode, Math.min(5, uniqueSizes[0] || 5), resolvedSeed);
   solveStrategy({ mode: req.mode, items: warm.items, budget: warm.budget, max_nodes: 500, time_limit_ms: 250 }, 'fifo');
   solveStrategy({ mode: req.mode, items: warm.items, budget: warm.budget, max_nodes: 500, time_limit_ms: 250 }, 'lc');
 
@@ -682,7 +691,7 @@ export function runLocalBenchmarkSuite(req: BenchmarkRequestPayload): BenchmarkR
     const { items, budget } = generateLocalBenchmarkDataset(
       req.mode,
       size,
-      req.seed || 42,
+      resolvedSeed,
       req.dataset_source === 'custom' ? req.custom_items : undefined,
       req.budget
     );
@@ -760,8 +769,10 @@ export function runLocalBenchmarkSuite(req: BenchmarkRequestPayload): BenchmarkR
   });
 
   return {
+    dataset_name: resolvedDatasetName,
     mode: req.mode,
     dataset_source: req.dataset_source,
+    seed: resolvedSeed,
     repetitions: req.repetitions,
     warmup_performed: true,
     generated_at: new Date().toISOString(),
@@ -987,8 +998,14 @@ export function buildLocalBenchmarkCsv(bench: BenchmarkResponse): string {
     'DP Optimal Value',
     'Matches DP',
     'Verification Status',
+    'Dataset Name',
+    'Dataset Source',
+    'Seed',
   ];
   const lines = [headers.join(',')];
+  const dName = (bench.dataset_name || 'Generated Benchmark Pool').replace(/"/g, '""');
+  const dSource = bench.dataset_source || 'generated';
+  const dSeed = bench.seed ?? 42;
   for (const row of bench.rows) {
     for (const [m, matchDp] of [
       [row.fifo, row.verification.fifo_matches_dp],
@@ -1017,6 +1034,9 @@ export function buildLocalBenchmarkCsv(bench: BenchmarkResponse): string {
           row.verification.dp_optimal_value.toFixed(2),
           matchDp ? 'Yes' : 'No',
           `"${row.verification.status_label.replace(/"/g, '""')}"`,
+          `"${dName}"`,
+          dSource,
+          dSeed,
         ].join(',')
       );
     }
