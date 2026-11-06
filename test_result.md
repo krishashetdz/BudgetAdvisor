@@ -263,4 +263,4 @@ agent_communication:
 # 3. Remaining Limitations / Notes:
 #    - Dataset size is intentionally bounded at 24 items (`max_length=24`), explored node visits at 50,000 (`max_nodes <= 50,000`), DP retained states at 50,000 / evaluations at 200,000, and per-solver wall-clock timeout at 1,500 ms to ensure interactive responsiveness.
 #    - When MongoDB is not running on `localhost:27017`, the backend automatically uses its built-in in-memory database fallback (`_InMemoryClient`), which supports full runtime CRUD within the server process lifetime.
-#    - Team member names in `README.md` (`Member 1: [Full Name]` .. `Member 4: [Full Name]`) are editable placeholders awaiting the group's actual names prior to final submission.
+#    - Team member names and roles in `README.md` and `docs/Project_Technical_Documentation.md` are populated for Kris Rodrigues (Project Lead & Systems Architect), Krisha Shet (Algorithm & Baseline Verification), Megha Gobre (Backend Infrastructure & Analytical Engines), and Jeolita Parpatekar (Frontend & UI/UX Visualization).
