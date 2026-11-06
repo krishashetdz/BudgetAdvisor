@@ -31,13 +31,14 @@ import {
   triggerBrowserDownload,
 } from '../api';
 import { Workspace } from '../hooks/useWorkspace';
+import { CUSTOM_VARIATION_DISCLOSURE, SHARED_BENCHMARK_SIZES } from '../localSolver';
 import { BenchmarkRequestPayload, BenchmarkResponse, money, number } from '../types';
 
-const AVAILABLE_SIZES = [5, 10, 15, 20, 24];
+const AVAILABLE_SIZES = SHARED_BENCHMARK_SIZES;
 
 export default function PerformanceAnalysis({ workspace: w }: { workspace: Workspace }) {
   const [datasetSource, setDatasetSource] = useState<'generated' | 'custom'>('generated');
-  const [selectedSizes, setSelectedSizes] = useState<number[]>([5, 10, 15, 20, 24]);
+  const [selectedSizes, setSelectedSizes] = useState<number[]>([...SHARED_BENCHMARK_SIZES]);
   const [repetitions, setRepetitions] = useState<number>(3);
   const [seed, setSeed] = useState<number>(42);
   const [busy, setBusy] = useState<boolean>(false);
@@ -125,12 +126,22 @@ export default function PerformanceAnalysis({ workspace: w }: { workspace: Works
     lcQueue: row.lc.max_queue_size,
   }));
 
+  const origDatasetSize =
+    benchmark?.original_dataset_size ??
+    (datasetSource === 'custom' ? w.data?.items.length || 0 : 24);
+  const maxExpandedSize =
+    benchmark?.max_expanded_dataset_size ??
+    (selectedSizes.length ? Math.max(...selectedSizes) : 0);
+  const usesVariations =
+    benchmark?.uses_generated_variations ??
+    (datasetSource === 'custom' ? selectedSizes.some(s => s > (w.data?.items.length || 0)) : true);
+
   return (
     <div className="dashboard page-enter" data-mode={w.mode} data-testid="performance-analysis-page">
       <div className="page-heading">
         <div>
           <div className="eyebrow" data-testid="benchmark-eyebrow">
-            DESIGN & ANALYSIS OF ALGORITHMS · EMPIRICAL BENCHMARKING
+            DESIGN &amp; ANALYSIS OF ALGORITHMS · EMPIRICAL BENCHMARKING
           </div>
           <h1 data-testid="benchmark-title">
             Performance analysis<span className="heading-period">.</span>
@@ -192,12 +203,10 @@ export default function PerformanceAnalysis({ workspace: w }: { workspace: Works
                 Current Custom Dataset ({w.data?.items.length || 0} items)
               </button>
             </div>
-            {datasetSource === 'custom' && (
-              <p className="field-hint" data-testid="custom-expansion-notice" style={{ marginTop: 8, fontSize: '0.82rem', color: '#64748b', lineHeight: 1.45 }}>
-                <Info size={13} style={{ display: 'inline', verticalAlign: 'text-bottom', marginRight: 4 }} />
-                <strong>Custom Dataset Scalability Note:</strong> Datasets exceeding the original custom item count ({w.data?.items.length || 0} items) are expanded using reproducible variations derived from the original dataset. These additional entries are generated for algorithm scalability testing and are not independently entered real-world products. (Original dataset: {w.data?.items.length || 0} items · Variations used for benchmark sizes &gt; {w.data?.items.length || 0}).
-              </p>
-            )}
+            <p className="field-hint" data-testid="custom-expansion-notice" style={{ marginTop: 8, fontSize: '0.82rem', color: '#64748b', lineHeight: 1.45 }}>
+              <Info size={13} style={{ display: 'inline', verticalAlign: 'text-bottom', marginRight: 4 }} />
+              <strong>Custom Dataset Scalability Disclosure:</strong> {CUSTOM_VARIATION_DISCLOSURE} (Original dataset size: <code>{origDatasetSize}</code> items · Expanded dataset size: up to <code>{maxExpandedSize}</code> items across <code>[{selectedSizes.join(', ')}]</code> · Dataset source: <code>{datasetSource}</code> · Benchmark seed: <code>{seed}</code> · Generated variations used: <code>{usesVariations ? 'Yes' : 'No'}</code>).
+            </p>
           </div>
 
           <div className="control-group">
@@ -238,23 +247,21 @@ export default function PerformanceAnalysis({ workspace: w }: { workspace: Works
             </select>
           </div>
 
-          {datasetSource === 'generated' && (
-            <div className="control-group control-group-compact">
-              <label htmlFor="bench-seed" className="control-label">
-                Reproducible Seed
-              </label>
-              <input
-                id="bench-seed"
-                data-testid="benchmark-seed-input"
-                type="number"
-                min={1}
-                max={999999}
-                className="feature-input"
-                value={seed}
-                onChange={e => setSeed(Math.max(1, Number(e.target.value) || 42))}
-              />
-            </div>
-          )}
+          <div className="control-group control-group-compact">
+            <label htmlFor="bench-seed" className="control-label">
+              Reproducible Seed
+            </label>
+            <input
+              id="bench-seed"
+              data-testid="benchmark-seed-input"
+              type="number"
+              min={1}
+              max={999999}
+              className="feature-input"
+              value={seed}
+              onChange={e => setSeed(Math.max(1, Number(e.target.value) || 42))}
+            />
+          </div>
 
           <div className="control-actions">
             <Button
@@ -296,7 +303,7 @@ export default function PerformanceAnalysis({ workspace: w }: { workspace: Works
                 </h2>
               </div>
               <span className="count-tag" data-testid="benchmark-meta-tag">
-                {benchmark.dataset_name || benchmark.dataset_source} · Seed {benchmark.seed ?? seed} · Warm-up + {benchmark.repetitions}× median · Limit {number(w.maxNodes)} explored nodes
+                {benchmark.dataset_name || benchmark.dataset_source} · Source: {benchmark.dataset_source} · Base: {origDatasetSize} items → Expanded: {maxExpandedSize} items · Variations: {usesVariations ? 'Yes' : 'No'} · Seed {benchmark.seed ?? seed} · Warm-up + {benchmark.repetitions}× median
               </span>
             </div>
 
@@ -358,7 +365,7 @@ export default function PerformanceAnalysis({ workspace: w }: { workspace: Works
               <div className="chart-card" data-testid="chart-nodes-pruned">
                 <div className="chart-card-header">
                   <h3>Nodes Pruned vs. Dataset Size</h3>
-                  <span>Bound-pruned + budget-infeasible nodes discarded</span>
+                  <span>Total pruned = bound-pruned + infeasible-pruned nodes</span>
                 </div>
                 <div className="chart-canvas-wrap">
                   <ResponsiveContainer width="100%" height={240}>
@@ -414,7 +421,7 @@ export default function PerformanceAnalysis({ workspace: w }: { workspace: Works
           <section className="benchmark-table-section" aria-label="Benchmark results table">
             <div className="section-heading">
               <div>
-                <span className="section-kicker">SIDE-BY-SIDE METRICS & DP VERIFICATION</span>
+                <span className="section-kicker">SIDE-BY-SIDE METRICS &amp; DP VERIFICATION</span>
                 <h2 data-testid="benchmark-table-heading">Benchmark Results Table</h2>
               </div>
               <span className="count-tag">
@@ -432,12 +439,12 @@ export default function PerformanceAnalysis({ workspace: w }: { workspace: Works
                     <th className="num-col">Execution Time</th>
                     <th className="num-col">Nodes Generated</th>
                     <th className="num-col">Nodes Explored</th>
-                    <th className="num-col">Nodes Pruned</th>
+                    <th className="num-col">Nodes Pruned (Bound / Infeasible)</th>
                     <th className="num-col">Max Queue Size</th>
                     <th className="num-col">Optimal Value</th>
                     <th className="num-col">Selected Cost</th>
                     <th className="num-col">Remaining Budget</th>
-                    <th>DP Verification & Status</th>
+                    <th>DP Verification &amp; Status</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -455,6 +462,11 @@ export default function PerformanceAnalysis({ workspace: w }: { workspace: Works
                         {idx === 0 && (
                           <td rowSpan={2} className="group-cell">
                             <strong>{row.dataset_size} items</strong>
+                            {row.uses_generated_variations && benchmark.dataset_source === 'custom' && (
+                              <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: 2 }}>
+                                Base {row.original_dataset_size ?? origDatasetSize} + variations
+                              </div>
+                            )}
                           </td>
                         )}
                         {idx === 0 && (
@@ -468,7 +480,15 @@ export default function PerformanceAnalysis({ workspace: w }: { workspace: Works
                         <td className="num-col">{m.execution_time_ms.toFixed(3)} ms</td>
                         <td className="num-col">{number(m.nodes_generated)}</td>
                         <td className="num-col">{number(m.nodes_explored)}</td>
-                        <td className="num-col">{number(m.nodes_pruned)}</td>
+                        <td
+                          className="num-col"
+                          title={`Total pruned: ${m.nodes_pruned} (${m.bound_pruned} bound-pruned + ${m.infeasible_pruned} infeasible-pruned)`}
+                        >
+                          {number(m.nodes_pruned)}{' '}
+                          <span style={{ fontSize: '0.74rem', color: '#64748b' }}>
+                            ({number(m.bound_pruned)}B / {number(m.infeasible_pruned)}I)
+                          </span>
+                        </td>
                         <td className="num-col">{number(m.max_queue_size)}</td>
                         <td className="num-col">
                           <strong>{number(m.optimal_value)}</strong>
@@ -500,7 +520,9 @@ export default function PerformanceAnalysis({ workspace: w }: { workspace: Works
 
             <div className="hardware-disclaimer" data-testid="benchmark-hardware-note">
               <BarChart3 size={14} />
-              <span>{benchmark.hardware_note}</span>
+              <span>
+                {benchmark.hardware_note} {benchmark.expansion_note || CUSTOM_VARIATION_DISCLOSURE}
+              </span>
             </div>
           </section>
         </>

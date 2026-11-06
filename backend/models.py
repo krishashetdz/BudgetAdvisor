@@ -12,6 +12,15 @@ else:
     from pydantic import validator as _v1_validator, root_validator as _v1_root_validator
 
 
+SHARED_BENCHMARK_SIZES: list[int] = [5, 10, 15, 20, 24]
+SHARED_BENCHMARK_REPETITIONS: int = 3
+CUSTOM_VARIATION_DISCLOSURE: str = (
+    'Datasets exceeding the original custom item count are expanded using reproducible variations '
+    'derived from the original dataset. These additional entries are generated for algorithm '
+    'scalability testing and are not independently entered real-world products.'
+)
+
+
 def _validate_finite_decimal(val: Any, max_decimals: int = 2, gt: Optional[Decimal] = None, ge: Optional[Decimal] = None, le: Optional[Decimal] = None) -> Decimal:
     if isinstance(val, float) and (math.isnan(val) or math.isinf(val)):
         raise ValueError('Input should be a finite number.')
@@ -214,8 +223,8 @@ class BenchmarkRequest(CompatModel):
     dataset_name: Optional[str] = Field(default=None, max_length=120)
     mode: Literal['shopping', 'investment'] = 'shopping'
     dataset_source: Literal['generated', 'custom'] = 'generated'
-    sizes: list[int] = Field(default_factory=lambda: [5, 10, 15, 20, 24])
-    repetitions: int = Field(default=3, ge=1, le=7)
+    sizes: list[int] = Field(default_factory=lambda: list(SHARED_BENCHMARK_SIZES))
+    repetitions: int = Field(default=SHARED_BENCHMARK_REPETITIONS, ge=1, le=7)
     seed: int = Field(default=42, ge=1, le=999_999)
     budget: Optional[Decimal] = None
     custom_items: Optional[list[Item]] = None
@@ -301,6 +310,9 @@ class BenchmarkVerification(CompatModel):
 
 class BenchmarkRow(CompatModel):
     dataset_size: int
+    original_dataset_size: int = 0
+    expanded_dataset_size: int = 0
+    uses_generated_variations: bool = False
     budget: float
     fifo: BenchmarkAlgorithmMetrics
     lc: BenchmarkAlgorithmMetrics
@@ -311,6 +323,10 @@ class BenchmarkResponse(CompatModel):
     dataset_name: str = 'Generated Benchmark Pool'
     mode: Literal['shopping', 'investment']
     dataset_source: Literal['generated', 'custom']
+    original_dataset_size: int = 0
+    max_expanded_dataset_size: int = 0
+    uses_generated_variations: bool = False
+    expansion_note: str = CUSTOM_VARIATION_DISCLOSURE
     seed: int = 42
     repetitions: int
     warmup_performed: bool
@@ -434,8 +450,8 @@ class ReportExportRequest(CompatModel):
     sensitivity_intervals: int = Field(default=6, ge=2, le=15)
     include_benchmark: bool = False
     benchmark_dataset_source: Optional[Literal['custom', 'generated']] = None
-    benchmark_sizes: list[int] = Field(default_factory=lambda: [5, 10, 15, 20, 24])
-    benchmark_repetitions: int = Field(default=3, ge=1, le=7)
+    benchmark_sizes: list[int] = Field(default_factory=lambda: list(SHARED_BENCHMARK_SIZES))
+    benchmark_repetitions: int = Field(default=SHARED_BENCHMARK_REPETITIONS, ge=1, le=7)
     benchmark_seed: int = Field(default=42, ge=1, le=999_999)
 
     if PYDANTIC_V2:

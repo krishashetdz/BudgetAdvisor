@@ -3,6 +3,12 @@
 Zero third-party PDF dependencies required: uses a deterministic, self-contained
 PDF 1.4 writer with native vector graphics, crisp tables, consistent typography,
 automatic pagination, and page numbers ("Page X of Y").
+
+Pruning Terminology & Mathematical Invariants:
+- Total pruned nodes = bound-pruned nodes (node.bound < best_score) + infeasible-pruned nodes (node.cost > budget).
+- Generated nodes = 1 + 2 * expanded = explored (visited) + frontier_remaining.
+- Datasets exceeding the original custom item count are expanded using reproducible variations
+  derived from the original dataset for algorithm scalability testing.
 """
 import csv
 from datetime import datetime, timezone
@@ -12,6 +18,7 @@ import io
 from models import (
     BenchmarkRequest,
     BenchmarkResponse,
+    CUSTOM_VARIATION_DISCLOSURE,
     ReportExportRequest,
     SensitivityPoint,
     SensitivityRequest,
@@ -331,7 +338,7 @@ class AcademicPDFBuilder:
             self.draw_rect(x - 2.3, y - 2.3, 4.6, 4.6, fill_rgb=(0.18, 0.38, 0.34))
             if idx % label_stride == 0 or idx == len(coords) - 1:
                 self.draw_text(x - 14, plot_y - 11, f'Rs.{p.budget:,.0f}', font='F1', size=6.3, rgb=(0.40, 0.46, 0.44))
-            self.draw_text(x - 8, y + 4.5, f'{p.optimal_score:,.0f}', font='F2', size=6.6, rgb=(0.18, 0.38, 0.34))
+            self.draw_text(x + 3 if idx == 0 else x - 8, y + 4.5, f'{p.optimal_score:,.0f}', font='F2', size=6.6, rgb=(0.18, 0.38, 0.34))
 
         self.y = box_y - 6
 
@@ -538,9 +545,12 @@ def generate_optimization_pdf_report(req: ReportExportRequest) -> bytes:
     )
     pdf.add_paragraph(
         f'Node-Limit & Pruning Note: Configured search limit caps explored (visited) nodes at {req.max_nodes:,} '
-        f'({req.time_limit_ms:,} ms timeout). Pruned nodes represent the sum of upper-bound pruned nodes (node.bound < best_score) '
-        f'and infeasible budget-pruned nodes (node.cost > budget). Because each expanded node generates 2 children, '
-        'generated nodes (1 + 2*expanded = explored + frontier) can exceed explored nodes when a search is capped.'
+        f'({req.time_limit_ms:,} ms timeout). Total pruned nodes = bound-pruned nodes (node.bound < best_score) + '
+        f'infeasible-pruned nodes (node.cost > budget) [FIFO: {run.fifo.pruned:,} total ({run.fifo.bound_pruned:,} '
+        f'bound-pruned + {run.fifo.infeasible_pruned:,} infeasible-pruned); LC: {run.lc.pruned:,} total '
+        f'({run.lc.bound_pruned:,} bound-pruned + {run.lc.infeasible_pruned:,} infeasible-pruned)]. '
+        'Because each expanded node generates 2 children, generated nodes (1 + 2*expanded = explored + frontier) '
+        'can exceed explored nodes when a search is capped.'
     )
 
     if req.include_benchmark and req.benchmark_sizes:
@@ -577,13 +587,14 @@ def generate_optimization_pdf_report(req: ReportExportRequest) -> bytes:
                     f'{m.max_queue_size:,}',
                     f'{m.optimal_value:,.2f}',
                 ])
-        base_item_cnt = len(req.items)
-        has_expanded = b_source == 'custom' and any(brow.dataset_size > base_item_cnt for brow in bench_res.rows)
-        max_size = max((brow.dataset_size for brow in bench_res.rows), default=0)
+        base_item_cnt = bench_res.original_dataset_size
+        has_expanded = bench_res.uses_generated_variations
+        max_size = bench_res.max_expanded_dataset_size
         src_desc = (
-            f'Source: Custom [{req.dataset_name}], Base {base_item_cnt} items, Expanded to {max_size} items, Variations: {"Yes" if has_expanded else "No"}, Budget Rs. {float(req.budget):,.0f}, Seed {req.benchmark_seed}'
+            f'Source: Custom [{req.dataset_name}], Base {base_item_cnt} items, Expanded to {max_size} items, '
+            f'Variations: {"Yes" if has_expanded else "No"}, Budget Rs. {float(req.budget):,.0f}, Seed {req.benchmark_seed}'
             if b_source == 'custom'
-            else f'Source: Generated Pool [{req.mode.title()}], Seed {req.benchmark_seed}'
+            else f'Source: Generated Pool [{req.mode.title()}], Base Pool {base_item_cnt} items, Expanded to {max_size} items, Variations: Yes, Seed {req.benchmark_seed}'
         )
         pdf.add_paragraph(
             f'Multi-Size Scaling Benchmark Summary ({src_desc}):',
@@ -597,12 +608,9 @@ def generate_optimization_pdf_report(req: ReportExportRequest) -> bytes:
             rows=bench_rows,
             col_Editable_fractions=[0.11, 0.10, 0.14, 0.13, 0.13, 0.13, 0.13, 0.13],
         )
-        if has_expanded:
-            pdf.add_paragraph(
-                'Note on Custom Datasets: Datasets exceeding the original custom item count are expanded using '
-                'reproducible variations derived from the original dataset. These additional entries are generated '
-                'for algorithm scalability testing and are not independently entered real-world products.'
-            )
+        pdf.add_paragraph(
+            f'Note on Custom Datasets: {CUSTOM_VARIATION_DISCLOSURE}'
+        )
 
     # Section 5: Verification
     pdf.add_section_heading('5', 'Independent Dynamic Programming Verification', min_following_space=62.0)
@@ -682,8 +690,8 @@ def generate_optimization_pdf_report(req: ReportExportRequest) -> bytes:
     lc_infeas = getattr(run.lc, 'infeasible_pruned', None)
     if lc_bound is not None and lc_infeas is not None:
         lc_pruning_clause = (
-            f'pruned {run.lc.pruned:,} nodes in total, including {lc_bound:,} bound-pruned nodes '
-            f'and {lc_infeas:,} infeasible nodes'
+            f'pruned {run.lc.pruned:,} nodes, including {lc_bound:,} bound-pruned nodes '
+            f'and {lc_infeas:,} infeasible-pruned nodes'
         )
     else:
         lc_pruning_clause = f'pruned {run.lc.pruned:,} nodes in total'
@@ -692,8 +700,8 @@ def generate_optimization_pdf_report(req: ReportExportRequest) -> bytes:
     fifo_infeas = getattr(run.fifo, 'infeasible_pruned', None)
     if fifo_bound is not None and fifo_infeas is not None:
         fifo_pruning_clause = (
-            f'pruned {run.fifo.pruned:,} nodes in total, including {fifo_bound:,} bound-pruned nodes '
-            f'and {fifo_infeas:,} infeasible nodes'
+            f'pruned {run.fifo.pruned:,} nodes, including {fifo_bound:,} bound-pruned nodes '
+            f'and {fifo_infeas:,} infeasible-pruned nodes'
         )
     else:
         fifo_pruning_clause = f'pruned {run.fifo.pruned:,} nodes in total'
@@ -701,17 +709,19 @@ def generate_optimization_pdf_report(req: ReportExportRequest) -> bytes:
     if node_diff > 0:
         eff_sentence = (
             f'LC Branch and Bound explored {run.lc.visited:,} nodes and {lc_pruning_clause}, '
-            f'compared to {run.fifo.visited:,} explored nodes for FIFO Branch and Bound.'
+            f'compared to {run.fifo.visited:,} explored nodes for FIFO Branch and Bound '
+            f'({fifo_pruning_clause}).'
         )
     elif node_diff < 0:
         eff_sentence = (
-            f'On this instance, FIFO Branch and Bound visited {run.fifo.visited:,} nodes ({fifo_pruning_clause}) while LC visited '
-            f'{run.lc.visited:,} nodes ({lc_pruning_clause}), illustrating that best-first ordering is not guaranteed to visit fewer nodes on every input.'
+            f'On this instance, FIFO Branch and Bound explored {run.fifo.visited:,} nodes and {fifo_pruning_clause}, '
+            f'while LC Branch and Bound explored {run.lc.visited:,} nodes and {lc_pruning_clause}, '
+            'illustrating that best-first ordering is not guaranteed to visit fewer nodes on every input.'
         )
     else:
         eff_sentence = (
-            f'Both FIFO and LC Branch and Bound explored exactly {run.lc.visited:,} nodes on this dataset '
-            f'(LC {lc_pruning_clause}).'
+            f'Both FIFO and LC Branch and Bound explored {run.lc.visited:,} nodes on this dataset; '
+            f'LC Branch and Bound explored {run.lc.visited:,} nodes and {lc_pruning_clause}.'
         )
 
     ver_sentence = (
@@ -727,7 +737,17 @@ def generate_optimization_pdf_report(req: ReportExportRequest) -> bytes:
 
 
 def generate_benchmark_csv(benchmark: BenchmarkResponse) -> str:
-    """Serialize benchmark results to a clean CSV string with explicit dataset source and seed identification."""
+    """Serialize benchmark results to a clean 24-column CSV string with explicit dataset source and seed identification.
+
+    Includes:
+    - Dataset Size (expanded size for each benchmark step)
+    - Mode, Budget (INR), Algorithm (FIFO / LC)
+    - Execution Time Median, Min, and Max (ms)
+    - Nodes Generated, Nodes Explored, Nodes Pruned, Bound Pruned, Infeasible Pruned, Max Queue Size
+    - Optimal Value, Selected Cost (INR), Remaining Budget (INR), Proven Optimal, Stop Reason
+    - DP Optimal Value, Matches DP, Verification Status
+    - Dataset Name, Dataset Source ('custom' or 'generated'), and Seed
+    """
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow([

@@ -1,4 +1,10 @@
-"""Advanced Algorithm Performance Benchmarking for FIFO B&B, LC B&B, and DP."""
+"""Advanced Algorithm Performance Benchmarking for FIFO B&B, LC B&B, and DP.
+
+Custom-Derived Benchmark Dataset Disclosure:
+Datasets exceeding the original custom item count are expanded using reproducible variations
+derived from the original dataset. These additional entries are generated for algorithm
+scalability testing and are not independently entered real-world products.
+"""
 from datetime import datetime, timezone
 from decimal import Decimal
 import random
@@ -11,6 +17,7 @@ from models import (
     BenchmarkResponse,
     BenchmarkRow,
     BenchmarkVerification,
+    CUSTOM_VARIATION_DISCLOSURE,
     Item,
     SolveRequest,
 )
@@ -64,7 +71,13 @@ def generate_benchmark_dataset(
     custom_items: list[Item] | None = None,
     explicit_budget: Decimal | None = None,
 ) -> tuple[list[Item], Decimal]:
-    """Generate a reproducible dataset of exact `size` items and a balanced budget."""
+    """Generate a reproducible dataset of exact `size` items and a balanced budget.
+
+    Note on Custom Datasets:
+    Datasets exceeding the original custom item count are expanded using reproducible variations
+    derived from the original dataset. These additional entries are generated for algorithm
+    scalability testing and are not independently entered real-world products.
+    """
     rng = random.Random(seed * 1000 + size)
 
     if custom_items and len(custom_items) > 0:
@@ -167,11 +180,18 @@ def _measure_strategy(request: SolveRequest, strategy: Literal['fifo', 'lc'], re
 def run_benchmark_suite(req: BenchmarkRequest) -> BenchmarkResponse:
     """Execute warm-up and multi-repetition benchmarks across requested dataset sizes."""
     unique_sizes = sorted(set(req.sizes))
+    pool_len = len(SHOPPING_BENCHMARK_POOL if req.mode == 'shopping' else INVESTMENT_BENCHMARK_POOL)
+    orig_size = len(req.custom_items or []) if req.dataset_source == 'custom' else pool_len
+    max_expanded = max(unique_sizes) if unique_sizes else 0
+    any_variations = (
+        (req.dataset_source == 'custom' and any(sz > orig_size for sz in unique_sizes))
+        or (req.dataset_source == 'generated')
+    )
 
     if req.dataset_name and req.dataset_name.strip():
         resolved_dataset_name = req.dataset_name.strip()
     elif req.dataset_source == 'custom':
-        resolved_dataset_name = f'Custom {req.mode.title()} Dataset ({len(req.custom_items or [])} base items)'
+        resolved_dataset_name = f'Custom {req.mode.title()} Dataset ({orig_size} base items)'
     else:
         resolved_dataset_name = f'Generated {req.mode.title()} Benchmark Pool (Seed {req.seed})'
 
@@ -252,9 +272,16 @@ def run_benchmark_suite(req: BenchmarkRequest) -> BenchmarkResponse:
             status_label=status_label,
         )
 
+        row_uses_variations = (
+            (size > orig_size) if req.dataset_source == 'custom' else True
+        )
+
         rows.append(
             BenchmarkRow(
                 dataset_size=size,
+                original_dataset_size=orig_size,
+                expanded_dataset_size=size,
+                uses_generated_variations=row_uses_variations,
                 budget=float(budget),
                 fifo=fifo_metrics,
                 lc=lc_metrics,
@@ -266,6 +293,10 @@ def run_benchmark_suite(req: BenchmarkRequest) -> BenchmarkResponse:
         dataset_name=resolved_dataset_name,
         mode=req.mode,
         dataset_source=req.dataset_source,
+        original_dataset_size=orig_size,
+        max_expanded_dataset_size=max_expanded,
+        uses_generated_variations=any_variations,
+        expansion_note=CUSTOM_VARIATION_DISCLOSURE,
         seed=req.seed,
         repetitions=req.repetitions,
         warmup_performed=True,

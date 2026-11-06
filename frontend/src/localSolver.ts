@@ -7,6 +7,7 @@ import {
   DPResult,
   Item,
   Mode,
+  ReportExportRequestPayload,
   Run,
   SearchFrame,
   SensitivityInsight,
@@ -18,6 +19,11 @@ import {
   TraceNode,
 } from './types';
 import { hundredths } from './manualSelection';
+
+export const SHARED_BENCHMARK_SIZES = [5, 10, 15, 20, 24];
+export const SHARED_BENCHMARK_REPETITIONS = 3;
+export const CUSTOM_VARIATION_DISCLOSURE =
+  'Datasets exceeding the original custom item count are expanded using reproducible variations derived from the original dataset. These additional entries are generated for algorithm scalability testing and are not independently entered real-world products.';
 
 export const SHOPPING_ROWS: [string, number, number][] = [
   ['Everyday backpack', 2800, 82],
@@ -96,6 +102,63 @@ export function getDefaultDatasets(): Record<Mode, Dataset> {
     shopping: build('shopping', SHOPPING_ROWS),
     investment: build('investment', INVESTMENT_ROWS),
   };
+}
+
+export function buildSharedExportPayloads(
+  mode: Mode,
+  datasetName: string,
+  items: Item[],
+  budget: string,
+  maxNodes: number,
+  runId: string | undefined,
+  includeSensitivity: boolean,
+  sensitivityIntervals: number,
+  includeBenchmark: boolean,
+  benchmarkSource: 'custom' | 'generated',
+  benchmarkSeed: number
+): { pdfPayload: ReportExportRequestPayload; csvPayload: BenchmarkRequestPayload } {
+  const cleanName = datasetName.trim() || `${mode.toUpperCase()} Dataset`;
+  const effectiveSource: 'custom' | 'generated' =
+    benchmarkSource === 'custom' && items.length > 0 ? 'custom' : 'generated';
+  const modeTitle = mode.charAt(0).toUpperCase() + mode.slice(1);
+  const resolvedBenchmarkName =
+    effectiveSource === 'custom'
+      ? cleanName
+      : `Generated ${modeTitle} Benchmark Pool (Seed ${benchmarkSeed})`;
+  const sharedSizes = [...SHARED_BENCHMARK_SIZES];
+
+  const pdfPayload: ReportExportRequestPayload = {
+    dataset_name: cleanName,
+    run_id: runId,
+    dataset_source: items.length > 0 ? 'custom' : 'generated',
+    mode,
+    items,
+    budget,
+    max_nodes: maxNodes,
+    time_limit_ms: 1500,
+    include_sensitivity: includeSensitivity,
+    sensitivity_intervals: sensitivityIntervals,
+    include_benchmark: includeBenchmark,
+    benchmark_dataset_source: effectiveSource,
+    benchmark_sizes: sharedSizes,
+    benchmark_repetitions: SHARED_BENCHMARK_REPETITIONS,
+    benchmark_seed: benchmarkSeed,
+  };
+
+  const csvPayload: BenchmarkRequestPayload = {
+    dataset_name: resolvedBenchmarkName,
+    mode,
+    dataset_source: effectiveSource,
+    sizes: sharedSizes,
+    repetitions: SHARED_BENCHMARK_REPETITIONS,
+    seed: benchmarkSeed,
+    budget: effectiveSource === 'custom' ? budget : undefined,
+    custom_items: effectiveSource === 'custom' ? items : undefined,
+    max_nodes: maxNodes,
+    time_limit_ms: 1500,
+  };
+
+  return { pdfPayload, csvPayload };
 }
 
 function gcd(a: number, b: number): number {
@@ -675,11 +738,19 @@ export function runLocalBenchmarkSuite(req: BenchmarkRequestPayload): BenchmarkR
   const uniqueSizes = Array.from(new Set(req.sizes)).sort((a, b) => a - b);
   const resolvedSeed = req.seed || 42;
   const modeTitle = req.mode.charAt(0).toUpperCase() + req.mode.slice(1);
+  const poolLen = (req.mode === 'shopping' ? SHOPPING_BENCHMARK_POOL : INVESTMENT_BENCHMARK_POOL).length;
+  const origSize = req.dataset_source === 'custom' ? (req.custom_items || []).length : poolLen;
+  const maxExpanded = uniqueSizes.length ? Math.max(...uniqueSizes) : 0;
+  const anyVariations =
+    req.dataset_source === 'custom'
+      ? uniqueSizes.some(sz => sz > origSize)
+      : true;
+
   const resolvedDatasetName =
     req.dataset_name && req.dataset_name.trim()
       ? req.dataset_name.trim()
       : req.dataset_source === 'custom'
-      ? `Custom ${modeTitle} Dataset (${(req.custom_items || []).length} base items)`
+      ? `Custom ${modeTitle} Dataset (${origSize} base items)`
       : `Generated ${modeTitle} Benchmark Pool (Seed ${resolvedSeed})`;
 
   // Warm-up run
@@ -748,6 +819,9 @@ export function runLocalBenchmarkSuite(req: BenchmarkRequestPayload): BenchmarkR
 
     return {
       dataset_size: size,
+      original_dataset_size: origSize,
+      expanded_dataset_size: size,
+      uses_generated_variations: req.dataset_source === 'custom' ? size > origSize : true,
       budget: Number(budget),
       fifo,
       lc,
@@ -772,6 +846,10 @@ export function runLocalBenchmarkSuite(req: BenchmarkRequestPayload): BenchmarkR
     dataset_name: resolvedDatasetName,
     mode: req.mode,
     dataset_source: req.dataset_source,
+    original_dataset_size: origSize,
+    max_expanded_dataset_size: maxExpanded,
+    uses_generated_variations: anyVariations,
+    expansion_note: CUSTOM_VARIATION_DISCLOSURE,
     seed: resolvedSeed,
     repetitions: req.repetitions,
     warmup_performed: true,

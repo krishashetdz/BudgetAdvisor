@@ -1,11 +1,11 @@
 Dataset Size,Mode,Budget (INR),Algorithm,Execution Time Median (ms),Execution Time Min (ms),Execution Time Max (ms),Nodes Generated,Nodes Explored,Nodes Pruned,Bound Pruned,Infeasible Pruned,Max Queue Size,Optimal Value,Selected Cost (INR),Remaining Budget (INR),Proven Optimal,Stop Reason,DP Optimal Value,Matches DP,Verification Status,Dataset Name,Dataset Source,Seed
-5,shopping,10000.00,FIFO,0.242,0.237,0.300,31,31,14,9,5,11,256.00,9900.00,100.00,Yes,completed,256.00,Yes,Verified Optimal (FIFO = LC = DP),Shopping Advisor Dataset,custom,42
-5,shopping,10000.00,LC,0.177,0.172,0.185,23,23,11,7,4,12,256.00,9900.00,100.00,Yes,completed,256.00,Yes,Verified Optimal (FIFO = LC = DP),Shopping Advisor Dataset,custom,42
-10,shopping,10000.00,FIFO,0.522,0.492,0.557,127,127,63,38,25,36,366.50,9910.00,90.00,Yes,completed,366.50,Yes,Verified Optimal (FIFO = LC = DP),Shopping Advisor Dataset,custom,42
-10,shopping,10000.00,LC,0.362,0.362,0.366,69,69,34,12,22,35,366.50,9910.00,90.00,Yes,completed,366.50,Yes,Verified Optimal (FIFO = LC = DP),Shopping Advisor Dataset,custom,42
-15,shopping,10000.00,FIFO,0.677,0.661,0.684,197,197,98,90,8,79,470.50,9918.00,82.00,Yes,completed,470.50,Yes,Verified Optimal (FIFO = LC = DP),Shopping Advisor Dataset,custom,42
-15,shopping,10000.00,LC,0.264,0.258,0.267,31,31,15,7,8,16,470.50,9918.00,82.00,Yes,completed,470.50,Yes,Verified Optimal (FIFO = LC = DP),Shopping Advisor Dataset,custom,42
-20,shopping,10000.00,FIFO,1.300,1.268,1.400,563,563,280,153,127,133,482.75,9770.00,230.00,Yes,completed,482.75,Yes,Verified Optimal (FIFO = LC = DP),Shopping Advisor Dataset,custom,42
-20,shopping,10000.00,LC,0.893,0.864,0.894,291,291,144,25,119,146,482.75,9770.00,230.00,Yes,completed,482.75,Yes,Verified Optimal (FIFO = LC = DP),Shopping Advisor Dataset,custom,42
-24,shopping,10000.00,FIFO,1.879,1.875,1.912,877,877,438,292,146,222,535.75,9974.00,26.00,Yes,completed,535.75,Yes,Verified Optimal (FIFO = LC = DP),Shopping Advisor Dataset,custom,42
-24,shopping,10000.00,LC,1.037,1.017,1.055,349,349,174,44,130,175,535.75,9974.00,26.00,Yes,completed,535.75,Yes,Verified Optimal (FIFO = LC = DP),Shopping Advisor Dataset,custom,42
+5,shopping,10000.00,FIFO,1.516,1.285,1.815,31,31,14,9,5,11,256.00,9900.00,100.00,Yes,completed,256.00,Yes,Verified Optimal (FIFO = LC = DP),Shopping Advisor Dataset,custom,42
+5,shopping,10000.00,LC,0.746,0.740,0.828,23,23,11,7,4,12,256.00,9900.00,100.00,Yes,completed,256.00,Yes,Verified Optimal (FIFO = LC = DP),Shopping Advisor Dataset,custom,42
+10,shopping,10000.00,FIFO,2.380,2.322,2.533,127,127,63,38,25,36,366.50,9910.00,90.00,Yes,completed,366.50,Yes,Verified Optimal (FIFO = LC = DP),Shopping Advisor Dataset,custom,42
+10,shopping,10000.00,LC,1.900,1.606,3.366,69,69,34,12,22,35,366.50,9910.00,90.00,Yes,completed,366.50,Yes,Verified Optimal (FIFO = LC = DP),Shopping Advisor Dataset,custom,42
+15,shopping,10000.00,FIFO,2.680,2.458,4.283,197,197,98,90,8,79,470.50,9918.00,82.00,Yes,completed,470.50,Yes,Verified Optimal (FIFO = LC = DP),Shopping Advisor Dataset,custom,42
+15,shopping,10000.00,LC,1.031,1.020,1.047,31,31,15,7,8,16,470.50,9918.00,82.00,Yes,completed,470.50,Yes,Verified Optimal (FIFO = LC = DP),Shopping Advisor Dataset,custom,42
+20,shopping,10000.00,FIFO,3.783,3.437,6.279,563,563,280,153,127,133,482.75,9770.00,230.00,Yes,completed,482.75,Yes,Verified Optimal (FIFO = LC = DP),Shopping Advisor Dataset,custom,42
+20,shopping,10000.00,LC,4.684,2.602,4.911,291,291,144,25,119,146,482.75,9770.00,230.00,Yes,completed,482.75,Yes,Verified Optimal (FIFO = LC = DP),Shopping Advisor Dataset,custom,42
+24,shopping,10000.00,FIFO,4.392,4.280,4.730,877,877,438,292,146,222,535.75,9974.00,26.00,Yes,completed,535.75,Yes,Verified Optimal (FIFO = LC = DP),Shopping Advisor Dataset,custom,42
+24,shopping,10000.00,LC,4.876,3.263,6.375,349,349,174,44,130,175,535.75,9974.00,26.00,Yes,completed,535.75,Yes,Verified Optimal (FIFO = LC = DP),Shopping Advisor Dataset,custom,42

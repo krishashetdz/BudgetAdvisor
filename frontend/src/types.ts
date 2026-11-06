@@ -26,6 +26,11 @@ export interface Run {
   dp?: DPResult | null;
 }
 
+export const SHARED_BENCHMARK_SIZES = [5, 10, 15, 20, 24];
+export const SHARED_BENCHMARK_REPETITIONS = 3;
+export const CUSTOM_VARIATION_DISCLOSURE =
+  'Datasets exceeding the original custom item count are expanded using reproducible variations derived from the original dataset. These additional entries are generated for algorithm scalability testing and are not independently entered real-world products.';
+
 // Feature 1: Performance Benchmarking types
 export interface BenchmarkRequestPayload {
   dataset_name?: string;
@@ -76,6 +81,9 @@ export interface BenchmarkVerification {
 
 export interface BenchmarkRow {
   dataset_size: number;
+  original_dataset_size?: number;
+  expanded_dataset_size?: number;
+  uses_generated_variations?: boolean;
   budget: number;
   fifo: BenchmarkAlgorithmMetrics;
   lc: BenchmarkAlgorithmMetrics;
@@ -86,6 +94,10 @@ export interface BenchmarkResponse {
   dataset_name?: string;
   mode: Mode;
   dataset_source: 'generated' | 'custom';
+  original_dataset_size?: number;
+  max_expanded_dataset_size?: number;
+  uses_generated_variations?: boolean;
+  expansion_note?: string;
   seed?: number;
   repetitions: number;
   warmup_performed: boolean;

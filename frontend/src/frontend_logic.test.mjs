@@ -7,6 +7,7 @@
  * - SearchTree replay frame lookup (frames, atVisit binary search, timeline construction)
  * - Client-side FIFO B&B, LC B&B, Sparse DP, Benchmarking, Sensitivity, Saved Runs, and 24-column CSV export parity
  * - Zero-budget and no-fit best-case execution flow node-accounting invariants (generated = visited = 2n + 1)
+ * - Shared PDF & CSV benchmark-size configuration ([5, 10, 15, 20, 24]) and custom variation disclosure metadata
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -58,6 +59,7 @@ function loadTsModule(relPath, injectedModules = {}) {
   code = code.replace(/update:\s*\(draft:\s*Draft\)\s*=>\s*Draft/g, 'update');
   code = code.replace(/push\(item:\s*\{\s*negBound:\s*number;\s*id:\s*number;\s*node:\s*InternalNode\s*\}\):\s*void/g, 'push(item)');
   code = code.replace(/\):\s*\{\s*items:\s*Item\[\];\s*budget:\s*string\s*\}\s*\{/g, ') {');
+  code = code.replace(/\):\s*\{\s*pdfPayload:\s*ReportExportRequestPayload;\s*csvPayload:\s*BenchmarkRequestPayload\s*\}\s*\{/g, ') {');
 
   // Strip variable type annotations including comma-separated `let a: T = 0, b: T = 0;`
   code = code.replace(/\b(const|let)\s+(\w+)\s*:\s*[^=;\n]+=\s*/g, '$1 $2 = ');
@@ -198,12 +200,12 @@ test('2. useDraftHistory: seed, change, edit-group coalescing, Undo, Redo, and r
     mode: 'shopping',
     update: d => ({ ...d, selectedIds: ['shopping-1'], followsRecommendation: false }),
   });
-  assert.deepEqual(state.shopping.present.selectedIds, ['shopping-1']);
+  assert.deepEqual([...state.shopping.present.selectedIds], ['shopping-1']);
   assert.equal(state.shopping.past.length, 2);
 
   // Undo once -> reverts selection to [] and keeps budget '12000'
   state = reducer(state, { type: 'undo', mode: 'shopping' });
-  assert.deepEqual(state.shopping.present.selectedIds, []);
+  assert.deepEqual([...state.shopping.present.selectedIds], []);
   assert.equal(state.shopping.present.data.budget, '12000');
   assert.equal(state.shopping.past.length, 1);
   assert.equal(state.shopping.future.length, 1);
@@ -218,7 +220,7 @@ test('2. useDraftHistory: seed, change, edit-group coalescing, Undo, Redo, and r
   state = reducer(state, { type: 'redo', mode: 'shopping' });
   assert.equal(state.shopping.present.data.budget, '12000');
   state = reducer(state, { type: 'redo', mode: 'shopping' });
-  assert.deepEqual(state.shopping.present.selectedIds, ['shopping-1']);
+  assert.deepEqual([...state.shopping.present.selectedIds], ['shopping-1']);
   assert.equal(state.shopping.future.length, 0);
 });
 
@@ -239,6 +241,8 @@ test('3. localSolver: FIFO B&B, LC B&B, and Sparse DP match backend optima on Sh
   assert.equal(shopRun.fifo.remaining_budget, 300);
   assert.equal(shopRun.fifo.visited, 89);
   assert.equal(shopRun.lc.visited, 41);
+  assert.equal(shopRun.lc.pruned, shopRun.lc.bound_pruned + shopRun.lc.infeasible_pruned);
+  assert.equal(shopRun.fifo.pruned, shopRun.fifo.bound_pruned + shopRun.fifo.infeasible_pruned);
 
   const invRun = localSolver.computeLocalRun({
     ...defaults.investment,
@@ -334,4 +338,53 @@ test('5. localSolver: zero-budget and no-fit execution flow visits 2n + 1 nodes 
       assert.equal(res.proven_optimal, true);
     }
   }
+});
+
+test('6. Shared PDF & CSV benchmark-size configuration ([5, 10, 15, 20, 24]) and custom variation disclosure metadata', () => {
+  const defaults = localSolver.getDefaultDatasets();
+  assert.deepEqual([...localSolver.SHARED_BENCHMARK_SIZES], [5, 10, 15, 20, 24]);
+  assert.equal(localSolver.SHARED_BENCHMARK_REPETITIONS, 3);
+  assert.ok(
+    localSolver.CUSTOM_VARIATION_DISCLOSURE.includes(
+      'Datasets exceeding the original custom item count are expanded using reproducible variations derived from the original dataset'
+    )
+  );
+
+  // Verify buildSharedExportPayloads produces identical benchmark sizes, source, dataset name, seed, and context for PDF & CSV
+  const { pdfPayload, csvPayload } = localSolver.buildSharedExportPayloads(
+    'shopping',
+    'Shopping Advisor Dataset',
+    defaults.shopping.items,
+    defaults.shopping.budget,
+    50000,
+    'run-shared-123',
+    true,
+    6,
+    true,
+    'custom',
+    42
+  );
+  assert.deepEqual([...pdfPayload.benchmark_sizes], [5, 10, 15, 20, 24]);
+  assert.deepEqual([...csvPayload.sizes], [5, 10, 15, 20, 24]);
+  assert.deepEqual([...pdfPayload.benchmark_sizes], [...csvPayload.sizes]);
+  assert.equal(pdfPayload.benchmark_repetitions, csvPayload.repetitions);
+  assert.equal(pdfPayload.benchmark_dataset_source, csvPayload.dataset_source);
+  assert.equal(pdfPayload.benchmark_seed, csvPayload.seed);
+  assert.equal(pdfPayload.dataset_name, csvPayload.dataset_name);
+  assert.equal(pdfPayload.mode, csvPayload.mode);
+  assert.equal(pdfPayload.budget, csvPayload.budget);
+  assert.equal(pdfPayload.run_id, 'run-shared-123');
+
+  // Verify custom variation metadata in runLocalBenchmarkSuite
+  const customBench = localSolver.runLocalBenchmarkSuite({
+    ...csvPayload,
+    repetitions: 1,
+  });
+  assert.equal(customBench.original_dataset_size, 8);
+  assert.equal(customBench.max_expanded_dataset_size, 24);
+  assert.equal(customBench.uses_generated_variations, true);
+  assert.equal(customBench.rows[0].dataset_size, 5);
+  assert.equal(customBench.rows[0].uses_generated_variations, false);
+  assert.equal(customBench.rows[1].dataset_size, 10);
+  assert.equal(customBench.rows[1].uses_generated_variations, true);
 });

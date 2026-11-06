@@ -8,11 +8,11 @@
 - **Course:** Design and Analysis of Algorithms (DAA)
 - **Assigned Algorithm:** 0/1 Knapsack using FIFO Branch and Bound and Least Cost (LC) Branch and Bound
 - **Application:** Budget-Constrained Shopping / Investment Advisor
-- **Team Members:**
-  - **Kris Rodrigues** - Project Lead & Systems Architect (FIFO Branch and Bound Lead)
-  - **Krisha Shet** - Algorithm & Baseline Verification Engineer (LC B&B & Sparse DP)
-  - **Megha Gobre** - Backend Infrastructure & Analytical Engines Engineer
-  - **Jeolita Parpatekar** - Frontend & UI/UX Visualization Engineer
+- **Team Members (Editable Placeholders — Manual Input Required Before Submission):**
+  - **Member 1: [Full Name]** — FIFO Algorithm Development
+  - **Member 2: [Full Name]** — LC and Algorithm Verification
+  - **Member 3: [Full Name]** — Backend Development
+  - **Member 4: [Full Name]** — Frontend Development
 
 ## 3. Problem Statement
 Given a set of $n$ indivisible items or educational investment assets ($0 \le n \le 24$), where each item $i \in \{0, 1, \dots, n-1\}$ has a positive monetary cost $c_i > 0$ and an assigned utility or additive score $v_i \in \mathbb{R}$, and given a fixed non-negative budget $B \ge 0$, determine a binary selection vector $x = (x_0, x_1, \dots, x_{n-1}) \in \{0, 1\}^n$ that maximizes total score without exceeding the available budget:
@@ -30,7 +30,7 @@ All monetary costs, budgets, and scores are converted into exact integer hundred
 3. **Transparent Search Visualization & Replay:** Render the state-space decision trees side by side for FIFO and LC with step-by-step visit replay and live NDJSON progress streaming.
 4. **Dual Practical Application Modes:** Support consumer **Shopping Advisor** mode (scores $0\text{–}100$) and educational **Investment Advisor** mode (signed additive scores including negative-score loss avoidance).
 5. **Empirical Scaling & Parametric What-If Analysis:** Benchmark execution time, node counts, and frontier queue sizes across dataset sizes ($5$ to $24$ items), and evaluate how varying the available budget shifts the optimal combination.
-6. **Reproducible Academic Exports:** Export formatted 7-section **PDF Optimization Reports** and 24-column **CSV Benchmark Tables** with explicit dataset source, name, seed, and run identification.
+6. **Reproducible Academic Exports:** Export formatted 7-section **PDF Optimization Reports** and 24-column **CSV Benchmark Tables** with a shared benchmark-size configuration (`[5, 10, 15, 20, 24]`), explicit dataset source, name, seed, custom variation disclosure, and run identification.
 
 ## 5. 0/1 Knapsack Explanation
 Unlike the Fractional Knapsack Problem—where items can be divided arbitrarily and a greedy scan by descending profit density $v_i / c_i$ is globally optimal in $O(n \log n)$ time—the **0/1 Knapsack Problem** restricts every decision variable to $x_i \in \{0, 1\}$ (take the entire item or leave it). Because leaving unused budget capacity after skipping a large item can be suboptimal, greedy selection fails to guarantee 0/1 optimality. Branch and Bound systematically explores a binary state-space tree where level $d$ branches on including ($x_d = 1$) or excluding ($x_d = 0$) the $d$-th density-sorted item, using the continuous Fractional Knapsack relaxation as an optimistic upper bound to prune unpromising subtrees.
@@ -69,15 +69,17 @@ For a node at tree level `depth` with accumulated `cost` and `score`, `upper(dep
 BudgetAdvisor maintains six consistent node-accounting and search-limit definitions across `backend/solver.py`, API responses, UI panels, and exported PDF/CSV reports:
 1. **Nodes Generated (`generated` / `nodes_generated`):** Total search-tree nodes constructed and pushed into the frontier via `push(node)` (`root` + $2$ children per expanded node, so $\text{generated} = 1 + 2 \times \text{expanded}$). Both children—including an `include` child whose cost exceeds `budget` or whose bound is below `best_score`—are pushed into the frontier on generation and counted in `generated`.
 2. **Nodes Explored / Visited (`visited` / `nodes_explored`):** Total nodes popped from the frontier (`queue.popleft()` or `heapq.heappop()`) and evaluated in the search loop ($\text{visited} = \text{expanded} + \text{pruned} + \text{leaf\_visited}$).
-3. **Nodes Pruned (`pruned` / `nodes_pruned`):** Total explored (`visited`) nodes discarded without expansion ($\text{pruned} = \text{infeasible\_pruned} + \text{bound\_pruned}$). Note that an infeasible or bound-dominated child node is counted as `generated` when pushed by its parent and is counted as `visited` and `pruned` only when popped from the frontier; if the search terminates early due to a limit while that child is still waiting in the frontier, it remains in `frontier_remaining` and is not counted in `visited` or `pruned`.
+3. **Nodes Pruned (`pruned` / `nodes_pruned`):** Total explored (`visited`) nodes discarded without expansion:
+   $$\text{Total pruned nodes} = \text{bound\_pruned} + \text{infeasible\_pruned}$$
+   Note that an infeasible (`cost > budget`) or bound-dominated (`bound < best_score`) child node is counted as `generated` when pushed by its parent and is counted as `visited` and `pruned` (`infeasible_pruned` or `bound_pruned`) only when popped from the frontier; if the search terminates early due to a limit while that child is still waiting in the frontier, it remains in `frontier_remaining` and is not counted in `visited` or `pruned`.
 4. **Nodes Remaining in the Search Frontier (`frontier_remaining`):** Unpopped live nodes still waiting in the queue or priority queue when the search terminates ($\text{generated} = \text{visited} + \text{frontier\_remaining}$). Optimality is proven (`proven_optimal = True`) if and only if `frontier_remaining == 0`.
 5. **Configured Search-Node Limit (`max_nodes`, default `50,000`):** Enforced at the top of the loop via `if visited >= request.max_nodes: stop_reason = 'node_limit'; break`. This caps **explored (`visited`)** nodes (`visited <= max_nodes`), **not** `generated` nodes. Because each expanded node generates two children (`include` and `exclude`), total **generated** nodes can legitimately exceed `max_nodes` (up to $2 \times \text{visited} + 1 \le 100,001$ nodes when capped at $50,000$ visits).
 6. **Execution Timeout (`time_limit_ms`, default `1,500` ms):** Enforced via `if (perf_counter() - start) * 1000 >= request.time_limit_ms: stop_reason = 'time_limit'; break`. When triggered while nodes remain in the frontier, `proven_optimal` is set to `False` and `stop_reason = 'time_limit'`.
 
 ### Pruning Checks on Each Explored Node
-1. **Budget Feasibility Pruning (`infeasible_pruned` / `pruned_budget`):** When popped from the frontier, if `node.cost > budget` ($O(1)$ comparison), the node is immediately pruned without sorting indices or generating children.
+1. **Budget Feasibility Pruning (`infeasible_pruned` / `pruned_budget`):** When popped from the frontier, if `node.cost > budget` ($O(1)$ comparison), the node is immediately pruned as an **infeasible-pruned node** without sorting indices or generating children.
 2. **Canonical Incumbent Update:** If `node.cost <= budget`, the solver sorts `indices = tuple(sorted(node.chosen))` and updates `(best_score, best_cost, best_indices)` whenever `(-node.score, node.cost, indices) < (-best_score, best_cost, best_indices)`.
-3. **Upper-Bound Pruning (`bound_pruned` / `pruned_bound`):** If `node.bound < best_score` ($O(1)$ comparison), the subtree cannot beat `best_score` and is pruned. Strict inequality (`<`) is used so equal-bound nodes (`node.bound == best_score`) remain searchable, guaranteeing canonical cost and index tie-breaking.
+3. **Upper-Bound Pruning (`bound_pruned` / `pruned_bound`):** If `node.bound < best_score` ($O(1)$ comparison), the subtree cannot beat `best_score` and is pruned as a **bound-pruned node**. Strict inequality (`<`) is used so equal-bound nodes (`node.bound == best_score`) remain searchable, guaranteeing canonical cost and index tie-breaking.
 
 ## 10. Dynamic Programming Verification
 To verify FIFO and LC Branch and Bound without relying on tree bounds (`backend/dp_solver.py`):
@@ -99,12 +101,12 @@ In **Investment Advisor** mode (`mode = "investment"`):
 
 ## 13. Algorithm Visualization
 The **Search Race** panel (`frontend/src/components/SearchTree.tsx` and `TreeGraphic.tsx`) renders interactive side-by-side SVG state-space decision trees for FIFO and LC Branch and Bound:
-- Color-codes **Explored** nodes, the **Selected Optimal Path** (`on_solution`), **Pruned** branches (`pruned_budget` and `pruned_bound`), and live **Frontier** nodes.
+- Color-codes **Explored** nodes, the **Selected Optimal Path** (`on_solution`), **Pruned (bound + infeasible)** branches (`pruned_budget` and `pruned_bound`), and live **Frontier** nodes.
 - Stores up to 30 ancestor-closed `TraceNode` records per tree for legible rendering while tracking `hidden_children` and `trace_omitted` (`generated - len(trace)`) so full node counts are always disclosed.
 
 ## 14. Step-by-Step Replay
 Below the side-by-side decision trees, transport controls (`Play/Pause`, `Reset`, `Next Step`, `Jump to End`, timeline scrubber, and `0.5× / 1× / 2×` speed selector) replay the recorded `SearchFrame` history:
-- Synchronizes FIFO and LC by **visited-node count** (`tick`) rather than wall-clock animation speed, displaying live counters for `nodes visited`, `Pruned`, `Frontier`, `Best value`, and measured `ms compute` time.
+- Synchronizes FIFO and LC by **visited-node count** (`tick`) rather than wall-clock animation speed, displaying live counters for `nodes visited`, `Pruned` (with bound-pruned and infeasible-pruned breakdown upon completion), `Frontier`, `Best value`, and measured `ms compute` time.
 
 ## 15. Saved Runs
 The **Saved Runs** page (`/runs`, `frontend/src/pages/SavedRuns.tsx` and `/api/runs` endpoints) enables persistent storage and comparison of historical optimization snapshots:
@@ -115,15 +117,15 @@ The **Saved Runs** page (`/runs`, `frontend/src/pages/SavedRuns.tsx` and `/api/r
 The **Performance Analysis** page (`/performance`, `frontend/src/pages/PerformanceAnalysis.tsx` & `backend/benchmark.py`) empirically compares FIFO and LC Branch and Bound across configurable dataset sizes (`5, 10, 15, 20, 24` items):
 - Supports both **Generated Benchmark Datasets** (reproducible seeded pools, default `seed = 42`) and the user's **Current Custom Dataset**.
 - Executes an unrecorded **warm-up pass** followed by configurable repetitions ($1, 3, \text{or } 5$ runs) and reports the **median execution time** (plus min/max bounds).
-- Plots four comparative charts (*Execution Time vs. Dataset Size*, *Nodes Explored vs. Dataset Size*, *Nodes Pruned vs. Dataset Size*, and *Maximum Queue Size vs. Dataset Size*) alongside a full side-by-side verification table.
+- Plots four comparative charts (*Execution Time vs. Dataset Size*, *Nodes Explored vs. Dataset Size*, *Nodes Pruned vs. Dataset Size*, and *Maximum Queue Size vs. Dataset Size*) alongside a full side-by-side verification table showing total pruned, bound-pruned, and infeasible-pruned node counts.
 
-### Custom-Derived Benchmark Datasets
+### Custom-Derived Benchmark Datasets Disclosure
 Datasets exceeding the original custom item count are expanded using reproducible variations derived from the original dataset. These additional entries are generated for algorithm scalability testing and are not independently entered real-world products.
-- **Original Dataset Size:** Number of real-world items entered in the Optimizer ($0 \le n \le 24$).
-- **Expanded Dataset Size:** Scaled benchmark sizes ($5, 10, 15, 20, 24$ items).
-- **Dataset Source:** `custom` (user-provided workspace items) vs. `generated` (standard seeded test pool).
-- **Random Seed:** Reproducible pseudo-random seed ($42$ by default).
-- **Generated Variations:** When a benchmark size exceeds the base custom item count, controlled cost factors ($0.85\text{–}1.20\times$) and utility deltas are deterministically generated to evaluate scalability without inventing unrelated products.
+- **Original Dataset Size (`original_dataset_size`):** Number of base items entered in the custom workspace ($0 \le n \le 24$, e.g., $8$ base items in the default seeded dataset, or $24$ items in the generated pool).
+- **Expanded Dataset Size (`expanded_dataset_size` / `max_expanded_dataset_size`):** Scaled benchmark sizes (`[5, 10, 15, 20, 24]` items).
+- **Dataset Source (`dataset_source`):** `custom` (user-provided workspace items) vs. `generated` (standard seeded test pool).
+- **Benchmark Seed (`seed`):** Reproducible pseudo-random seed (`42` by default).
+- **Whether Generated Variations Were Used (`uses_generated_variations`):** `True` whenever an evaluated benchmark size exceeds the original custom item count (or when using the generated pool); `False` when all items in the benchmark step come directly from the original custom items without expansion.
 
 ## 17. What-If Budget Analysis
 The **What-If Budget Analysis** page (`/what-if`, `frontend/src/pages/WhatIfAnalysis.tsx` & `backend/sensitivity.py`) performs parametric budget sensitivity analysis:
@@ -135,32 +137,32 @@ The **PDF Optimization Report** (`POST /api/report/pdf`, `backend/report_generat
 1. **Project and Optimization Details:** Group ID `G12`, mode, dataset name, dataset source & size, budget, associated optimization `run_id`, separated UTC timestamp in the top header bar, and Investment mode disclaimer when applicable.
 2. **Input Dataset:** Full item table with costs, scores, score/cost ratios, and selection status.
 3. **Optimal Recommendation:** Recommended strategy, maximum score, expenditure, remaining budget, optimality status, and recommended item table (mathematically verified so expenditure equals sum of selected item costs $\le$ budget and score equals sum of selected item scores).
-4. **Algorithm Performance:** FIFO vs. LC execution time, generated/explored/pruned/frontier nodes, max queue size, node-limit & pruning note (distinguishing bound-pruned vs. infeasible-pruned nodes), and multi-size scaling benchmark summary using the shared benchmark configuration (`5, 10, 15, 20, 24` items) with explicit dataset source, seed, and custom expansion labeling.
+4. **Algorithm Performance:** FIFO vs. LC execution time, generated/explored/pruned/frontier nodes, max queue size, node-limit & pruning note (explicitly distinguishing bound-pruned and infeasible-pruned nodes), and multi-size scaling benchmark summary using the shared benchmark configuration (`[5, 10, 15, 20, 24]` items) with explicit original dataset size, expanded dataset size, dataset source, benchmark seed, whether generated variations were used, and the custom-derived dataset disclosure note.
 5. **Independent Dynamic Programming Verification:** DP baseline score, states explored, tri-method consensus, and execution-limit warnings when capped.
 6. **Budget Sensitivity / What-If Analysis:** Embedded vector sensitivity curve (labeled with the dataset name and item count), stepwise budget table, and automated insights.
-7. **Conclusion:** Data-driven summary with accurate pruning breakdown reporting total pruned nodes, bound-pruned nodes, and infeasible nodes.
+7. **Conclusion:** Data-driven summary with accurate pruning breakdown using the exact solver counters: *"LC Branch and Bound explored X nodes and pruned Y nodes, including Z bound-pruned nodes and W infeasible-pruned nodes."*
 
 ## 19. CSV Benchmark Export
 The **Benchmark CSV Export** (`POST /api/report/csv` and the **Export CSV** controls on `/performance` and `/reports`) exports multi-size FIFO and LC benchmark metrics (`budgetadvisor_<mode>_benchmark.csv`) with 24 columns:
-`Dataset Size`, `Mode`, `Budget (INR)`, `Algorithm`, `Execution Time Median (ms)`, `Execution Time Min (ms)`, `Execution Time Max (ms)`, `Nodes Generated`, `Nodes Explored`, `Nodes Pruned`, `Bound Pruned`, `Infeasible Pruned`, `Max Queue Size`, `Optimal Value`, `Selected Cost (INR)`, `Remaining Budget (INR)`, `Proven Optimal`, `Stop Reason`, `DP Optimal Value`, `Matches DP`, `Verification Status`, `Dataset Name`, `Dataset Source`, and `Seed`.
-On `/reports`, both PDF and CSV exports use a shared benchmark-size configuration (`5, 10, 15, 20, 24` items) and share the selected dataset context (`custom` vs. `generated` dataset source and `seed`), while execution times are naturally recorded as separate empirical measurement runs.
+`Dataset Size`, `Mode`, `Budget (INR)`, `Algorithm`, `Execution Time Median (ms)`, `Execution Time Min (ms)`, `Execution Time Max (ms)`, `Nodes Generated`, `Nodes Explored`, `Nodes Pruned`, `Bound Pruned`, `Infeasible Pruned`, `Max Queue Size`, `Optimal Value`, `Selected Cost (INR)`, `Remaining Budget (INR)`, `Proven Optimal`, `Stop Reason`, `DP Optimal Value`, `Matches DP`, `Verification Status`, `Dataset Name`, `Dataset Source`, and `Seed` (plus HTTP response metadata headers `X-Original-Dataset-Size`, `X-Max-Expanded-Dataset-Size`, `X-Uses-Generated-Variations`, and `X-Dataset-Expansion-Note`).
+On `/reports` (`frontend/src/pages/ExportReports.tsx`), both PDF and CSV exports use the shared benchmark-size configuration (`SHARED_BENCHMARK_SIZES = [5, 10, 15, 20, 24]`) and shared payload builder (`buildSharedExportPayloads`) so they share the exact same dataset name, `custom`/`generated` status, seed, budget, and optimization context. When triggered as separate downloads, each export executes an independent live benchmark measurement run (so deterministic node counts, pruning breakdowns, and optimal values match identically while empirical execution times reflect each separate run and are never artificially forced to match).
 
 ## 20. Technology Stack
 - **Backend:** Python 3.10+, FastAPI, Uvicorn, Pydantic (v1 & v2 compatibility layer), Motor (AsyncIO MongoDB driver) with automatic `mongomock_motor` and built-in `_InMemoryClient` fallback, `fractions.Fraction`, `collections.deque`, `heapq`, and custom PDF 1.4 vector report generator.
 - **Frontend:** React 19, TypeScript, Tailwind CSS, CRACO, React Router v7, Recharts, Framer Motion, Radix UI primitives, Lucide React icons, Sonner toast notifications, Axios.
-- **Testing:** Pytest (`backend/tests/`, 105 automated test cases) and Node.js test runner (`frontend/src/frontend_logic.test.mjs`, 5 frontend logic test suites).
+- **Testing:** Pytest (`backend/tests/`, 108 automated test cases) and Node.js test runner (`frontend/src/frontend_logic.test.mjs`, 6 frontend logic test suites).
 
 ## 21. Frontend Architecture
 Located in `frontend/src/`:
 - `App.tsx`: Top-level layout and navigation across `/`, `/performance`, `/what-if`, `/reports`, `/runs`, and `/method`.
 - `pages/Dashboard.tsx`: Main optimizer workspace with Shopping/Investment toggle, budget controls, editable item table, manual selection comparison, search race tree, and execution-limit controls.
-- `pages/PerformanceAnalysis.tsx`: Multi-size scaling benchmark controls, 4 Recharts graphs, and benchmark verification table.
+- `pages/PerformanceAnalysis.tsx`: Multi-size scaling benchmark controls, custom variation disclosure, 4 Recharts graphs, and benchmark verification table.
 - `pages/WhatIfAnalysis.tsx`: Parametric budget range controls, Pareto step-frontier chart, budget-point scrubber, and automated sensitivity insights.
-- `pages/ExportReports.tsx`: Shared report configuration (dataset title, sensitivity steps, benchmark source & seed) and one-click PDF & CSV download cards.
+- `pages/ExportReports.tsx`: Shared report configuration (`SHARED_BENCHMARK_SIZES = [5, 10, 15, 20, 24]`, dataset title, sensitivity steps, benchmark source & seed) and one-click PDF & CSV download cards.
 - `pages/SavedRuns.tsx`: Saved optimization runs list with restore and delete actions.
 - `pages/Method.tsx`: **Behind the Algorithm** reference detailing 0/1 Knapsack formulation, operation-level complexities, Best/Average/Worst cases, 5-part Space complexity, 6-part node-counter distinctions, and comparison table.
 - `hooks/useWorkspace.ts` & `hooks/useDraftHistory.ts`: Workspace state orchestration, validation, and 100-step Undo/Redo history with edit-group coalescing.
-- `localSolver.ts`, `manualSelection.ts`, `api.ts`, `stream.ts`: Client-side TypeScript solver mirror, exact integer-hundredth manual selection math, Axios client, and NDJSON stream reader.
+- `localSolver.ts`, `manualSelection.ts`, `api.ts`, `stream.ts`: Client-side TypeScript solver mirror, shared export payload builder (`buildSharedExportPayloads`), exact integer-hundredth manual selection math, Axios client, and NDJSON stream reader.
 
 ## 22. Backend Architecture
 Located in `backend/`:
@@ -168,10 +170,10 @@ Located in `backend/`:
 - `solver.py`: Exact integer-hundredth FIFO Branch and Bound and Least Cost (LC) Branch and Bound implementation with index-based $O(1)$-auxiliary-space fractional upper bound.
 - `dp_solver.py`: Independent Sparse-Cost 0/1 Dynamic Programming verification solver.
 - `computation.py`: Concurrent `ThreadPoolExecutor` runner executing FIFO, LC, and DP in parallel.
-- `benchmark.py`: Multi-size benchmark dataset generator, warm-up runner, and median timing aggregator.
+- `benchmark.py`: Multi-size benchmark dataset generator, custom variation metadata tracker, warm-up runner, and median timing aggregator.
 - `sensitivity.py`: Parametric budget sweep evaluator and automated insight generator.
-- `report_generator.py`: Self-contained 7-section PDF 1.4 vector report builder (with mathematical verification assertions) and 24-column CSV benchmark serializer.
-- `models.py` & `samples.py`: Strict Pydantic validation schemas and seeded Shopping/Investment datasets.
+- `report_generator.py`: Self-contained 7-section PDF 1.4 vector report builder (with mathematical verification assertions and accurate bound-pruned/infeasible-pruned terminology) and 24-column CSV benchmark serializer.
+- `models.py` & `samples.py`: Strict Pydantic validation schemas, shared benchmark constants, and seeded Shopping/Investment datasets.
 
 ## 23. API Endpoints
 
@@ -224,26 +226,26 @@ uvicorn server:app --host 127.0.0.1 --port 8000 --reload
 - If MongoDB is not running locally, the server automatically activates its built-in in-memory database fallback (`_InMemoryClient`).
 
 ## 27. Testing Instructions
-### Backend & End-to-End Pytest Suite (105 Tests)
+### Backend & End-to-End Pytest Suite (108 Tests)
 From the `backend/` directory (with the backend server running on `http://127.0.0.1:8000` for API E2E tests):
 ```bash
 cd backend
 pytest -v
 ```
-This executes **105 automated tests** across 5 test modules:
+This executes **108 automated tests** across 5 test modules:
 - `tests/test_solver_algorithm_validation.py` (**37 tests**): Exhaustive subset cross-checks, tree invariants, fractional upper bounds, node caps, and decimal/NaN/Inf validation.
 - `tests/test_api_e2e_budget_advisor.py` (**17 tests**): REST API validation (`422`), 32 KB payload guard (`413`), tie determinism, and Saved Runs CRUD lifecycle.
 - `tests/test_dp_stream_regression.py` (**16 tests**): Sparse DP exactness on positive/negative/zero/fractional items, DP cap honesty, and NDJSON stream monotonicity & slot recovery.
 - `tests/test_new_features_benchmark_sensitivity_reports.py` (**17 tests**): Multi-size benchmarking (warm-up, repetitions, median timing, node counts, timeouts), What-If sensitivity sweeps, and 7-section PDF & 24-column CSV export verification.
-- `tests/test_comprehensive_rubric_audit.py` (**18 tests**): AST/runtime verification of index-based `upper()` without list slicing, zero-budget and no-fit execution flow node-count verification (`2n + 1` nodes), FIFO level-order verification, single-item cases, exact-budget match, duplicate costs & values, multi-optimal canonical tie-breaking, 24-item scale verification, `_InMemoryClient` fallback CRUD, PDF/CSV dataset consistency & mathematical verification, search-tree/replay invariants, and frontend logic execution.
+- `tests/test_comprehensive_rubric_audit.py` (**21 tests**): AST/runtime verification of index-based `upper()` without list slicing, zero-budget and no-fit execution flow node-count verification (`2n + 1` nodes), FIFO level-order verification, single-item cases, exact-budget match, duplicate costs & values, multi-optimal canonical tie-breaking, 24-item scale verification, `_InMemoryClient` fallback CRUD, PDF/CSV shared benchmark configuration (`[5, 10, 15, 20, 24]`), custom variation disclosure metadata, pruning terminology breakdown (`bound-pruned` and `infeasible-pruned` nodes), 4-member README placeholders, search-tree/replay invariants, and frontend logic execution.
 
-### Frontend Logic Test Suite (5 Node.js Test Suites)
+### Frontend Logic Test Suite (6 Node.js Test Suites)
 From the `frontend/` directory:
 ```bash
 cd frontend
 node --test src/frontend_logic.test.mjs
 ```
-This directly verifies `manualSelection.ts` (`hundredths` and `selectionTotals`), `useDraftHistory.ts` (`seed`, `change` with edit-group coalescing, `undo`, `redo`), and `localSolver.ts` (FIFO, LC, DP, Benchmark, Sensitivity, Saved Runs, 24-column CSV export parity, and zero-budget/no-fit `2n + 1` node invariants).
+This directly verifies `manualSelection.ts` (`hundredths` and `selectionTotals`), `useDraftHistory.ts` (`seed`, `change` with edit-group coalescing, `undo`, `redo`), and `localSolver.ts` (FIFO, LC, DP, Benchmark, Sensitivity, Saved Runs, 24-column CSV export parity, zero-budget/no-fit `2n + 1` node invariants, and shared `[5, 10, 15, 20, 24]` PDF/CSV export configuration).
 
 ## 28. Corrected Time Complexity
 
@@ -324,56 +326,57 @@ We distinguish five memory quantities in the actual implementation:
 | **Max Frontier / Total Space** | $O(n \cdot m_{\max}) \subseteq O(n 2^n)$ ($O(2^n)$ nodes) | $O(n \cdot m_{\max}) \subseteq O(n 2^n)$ ($O(2^n)$ nodes) | $O(n \cdot S)$ total ($O(S)$ retained states) |
 | **Configured Safeguards** | $50,000$ explored (`visited`) nodes · $1,500\text{ ms}$ | $50,000$ explored (`visited`) nodes · $1,500\text{ ms}$ | $50,000$ states · $200,000$ evals · $1,500\text{ ms}$ |
 
-## 30. Four-Member Workload Distribution
+## 30. Team Contributions and Workload Distribution
 
-> **Team Member Information & Submission Note (Group G12):** The four-member workload distribution below reflects the assigned members and the four core module boundaries (FIFO Algorithm Development, LC and Verification, Backend Development, and Frontend Development). If any member details or institution requirements change prior to final submission, update this section accordingly.
+> **Important Note on Authorship & Manual Information Required (Group G12):** The responsibilities listed below represent the suggested four-member workload distribution across the project's four architectural modules, **not** confirmed authorship. Because verified member names and individual authorship confirmations must be provided directly by the student group, the editable `[Full Name]` placeholders below are retained as the **only manual information required from the group** prior to final submission.
 
-- **Member 1 (FIFO Algorithm Core & Project Lead):** **Kris Rodrigues** — Project Lead & Systems Architect
-- **Member 2 (LC & Baseline Verification):** **Krisha Shet** — Algorithm & Baseline Verification Engineer
-- **Member 3 (Backend Development):** **Megha Gobre** — Backend Infrastructure & Analytical Engines Engineer
-- **Member 4 (Frontend Development):** **Jeolita Parpatekar** — Frontend & UI/UX Visualization Engineer
+### Editable Team Member Placeholders
+- **Member 1:** `[Full Name]`
+- **Member 2:** `[Full Name]`
+- **Member 3:** `[Full Name]`
+- **Member 4:** `[Full Name]`
 
-### Assigned Roles & Responsibilities
+### Suggested Responsibility Structure
 
-**Kris Rodrigues — Project Lead & Systems Architect (FIFO Algorithm Core)**
-- Overall system architecture, design coordination, and repository integration.
-- FIFO Branch and Bound state-space search implementation (`collections.deque`).
-- Exact rational value-to-cost density sorting and tie-breaking.
-- Index-based $O(1)$-auxiliary-space continuous fractional-knapsack upper-bound computation (`upper`).
-- Budget feasibility checking (`pruned_budget`) and upper-bound pruning (`pruned_bound`).
-- System-wide benchmarking safeguards, execution limits, and multi-platform deployment configuration.
+**Member 1 — FIFO Algorithm Development (`Member 1: [Full Name]`)**
+- FIFO Branch and Bound.
+- Queue implementation (`collections.deque`).
+- Upper-bound calculation (`upper(depth, cost, score)` in $O(1)$ auxiliary space).
+- Feasibility checking (`node.cost > budget` / `infeasible_pruned`).
+- Pruning (`bound_pruned` + `infeasible_pruned`).
 
-**Krisha Shet — Algorithm & Baseline Verification Engineer (LC Algorithm & DP)**
-- Least Cost (LC) Branch and Bound search implementation (`heapq`).
-- Priority queue ordering with exact rational tie-breaking on `(-node.bound, node.id, node)`.
-- Independent Sparse-Cost Dynamic Programming verification baseline (`backend/dp_solver.py`).
-- Rigorous algorithm correctness testing, edge-case validation, and empirical algorithm comparison.
-- Theoretical time and space complexity derivation and documentation.
+**Member 2 — LC and Algorithm Verification (`Member 2: [Full Name]`)**
+- LC Branch and Bound.
+- Priority queue (`heapq` binary min-heap on `(-node.bound, node.id, node)`).
+- Dynamic Programming verification (`backend/dp_solver.py`).
+- Correctness testing.
+- Complexity analysis.
 
-**Megha Gobre — Backend Infrastructure & Analytical Engines Engineer**
-- FastAPI asynchronous REST and NDJSON streaming API architecture (`backend/server.py`).
-- MongoDB persistence layer with seamless in-memory database fallback (`_InMemoryClient`).
-- Strict Pydantic input validation models and request bounds (`backend/models.py`).
-- Multi-size empirical Benchmarking engine (`backend/benchmark.py`).
-- Parametric What-If Budget Sensitivity engine (`backend/sensitivity.py`).
-- 7-section academic PDF 1.4 report generation and 24-column CSV data export (`backend/report_generator.py`).
+**Member 3 — Backend Development (`Member 3: [Full Name]`)**
+- FastAPI (`backend/server.py`).
+- MongoDB integration (with automatic `_InMemoryClient` fallback).
+- Input validation (`backend/models.py`).
+- Performance benchmarking APIs (`backend/benchmark.py`).
+- Sensitivity analysis APIs (`backend/sensitivity.py`).
+- PDF and CSV generation (`backend/report_generator.py`).
 
-**Jeolita Parpatekar — Frontend & UI/UX Visualization Engineer**
-- React + TypeScript Single-Page Application (SPA) architecture and modern responsive styling.
-- Dual practical application modes (Consumer Shopping Advisor and Educational Investment Advisor).
-- Interactive side-by-side SVG Search Tree visualization (`SearchTree.tsx`, `TreeGraphic.tsx`).
-- Visit-synchronized step-by-step tree replay with play, pause, jump-to-end, and speed controls.
-- 100-step Undo/Redo draft history reducer with edit-group coalescing (`useDraftHistory.ts`).
-- Performance Analysis, What-If Sensitivity, Saved Runs, and Export Reports user interfaces.
+**Member 4 — Frontend Development (`Member 4: [Full Name]`)**
+- Dashboard (`frontend/src/pages/Dashboard.tsx`).
+- Shopping and Investment modes.
+- Algorithm visualization (`frontend/src/components/SearchTree.tsx`, `TreeGraphic.tsx`).
+- Step-by-step replay.
+- Performance Analysis (`frontend/src/pages/PerformanceAnalysis.tsx`).
+- What-If Budget Analysis (`frontend/src/pages/WhatIfAnalysis.tsx`).
+- Export interface (`frontend/src/pages/ExportReports.tsx`).
 
-### Module Mapping Table
+### Source-File Mapping Table
 
-| Member | Role | Core Responsibilities | Associated Repository Files |
+| Member Placeholder | Suggested Module Role | Suggested Responsibilities | Verified Repository Source Files |
 | :--- | :--- | :--- | :--- |
-| **Kris Rodrigues** | **Project Lead & Systems Architect** | Overall system architecture, project coordination, FIFO Branch and Bound state-space search, `collections.deque` frontier queue, rational profit-density sorting, index-based $O(1)$-auxiliary-space fractional-knapsack upper bound (`upper`), budget feasibility checking (`pruned_budget`), and upper-bound pruning (`pruned_bound`). | `backend/solver.py`, `frontend/src/localSolver.ts`, `backend/tests/test_solver_algorithm_validation.py`, `render.yaml` |
-| **Krisha Shet** | **Algorithm & Baseline Verification Engineer** | Least Cost (LC) Branch and Bound search, `heapq` priority queue ordering on `(-node.bound, node.id, node)`, independent Sparse-Cost Dynamic Programming verification (`solve_dp`), algorithm correctness testing, and theoretical time/space complexity analysis. | `backend/solver.py`, `backend/dp_solver.py`, `frontend/src/pages/Method.tsx`, `backend/tests/test_dp_stream_regression.py`, `backend/tests/test_comprehensive_rubric_audit.py` |
-| **Megha Gobre** | **Backend Infrastructure & Analytical Engines Engineer** | FastAPI REST & NDJSON streaming server, MongoDB persistence & `_InMemoryClient` fallback, strict Pydantic input validation, multi-size Benchmarking APIs, What-If Sensitivity APIs, and 7-section PDF 1.4 & 24-column CSV report generation. | `backend/server.py`, `backend/models.py`, `backend/computation.py`, `backend/benchmark.py`, `backend/sensitivity.py`, `backend/report_generator.py`, `backend/samples.py`, `backend/tests/test_api_e2e_budget_advisor.py`, `backend/tests/test_new_features_benchmark_sensitivity_reports.py` |
-| **Jeolita Parpatekar** | **Frontend & UI/UX Visualization Engineer** | Optimizer Dashboard, Shopping and Investment modes, manual selection & Undo/Redo history, SVG Search Tree algorithm visualization, visit-synchronized step-by-step replay functionality, Performance Analysis interface, What-If interface, and Export interface. | `frontend/src/App.tsx`, `frontend/src/pages/Dashboard.tsx`, `frontend/src/pages/PerformanceAnalysis.tsx`, `frontend/src/pages/WhatIfAnalysis.tsx`, `frontend/src/pages/ExportReports.tsx`, `frontend/src/pages/SavedRuns.tsx`, `frontend/src/components/SearchTree.tsx`, `frontend/src/components/TreeGraphic.tsx`, `frontend/src/components/ItemTable.tsx`, `frontend/src/components/SelectionPanel.tsx`, `frontend/src/components/Results.tsx`, `frontend/src/hooks/useWorkspace.ts`, `frontend/src/hooks/useDraftHistory.ts`, `frontend/src/manualSelection.ts` |
+| **Member 1: [Full Name]** | **FIFO Algorithm Development** | FIFO Branch and Bound, queue implementation (`collections.deque`), upper-bound calculation (`upper`), feasibility checking (`infeasible_pruned`), and pruning (`bound_pruned`). | `backend/solver.py`, `frontend/src/localSolver.ts`, `backend/tests/test_solver_algorithm_validation.py` |
+| **Member 2: [Full Name]** | **LC and Algorithm Verification** | LC Branch and Bound, priority queue (`heapq`), Dynamic Programming verification (`solve_dp`), correctness testing, and complexity analysis. | `backend/solver.py`, `backend/dp_solver.py`, `frontend/src/pages/Method.tsx`, `backend/tests/test_dp_stream_regression.py`, `backend/tests/test_comprehensive_rubric_audit.py` |
+| **Member 3: [Full Name]** | **Backend Development** | FastAPI server, MongoDB integration & `_InMemoryClient` fallback, input validation, performance benchmarking APIs, sensitivity analysis APIs, and PDF and CSV generation. | `backend/server.py`, `backend/models.py`, `backend/computation.py`, `backend/benchmark.py`, `backend/sensitivity.py`, `backend/report_generator.py`, `backend/samples.py`, `backend/tests/test_api_e2e_budget_advisor.py`, `backend/tests/test_new_features_benchmark_sensitivity_reports.py` |
+| **Member 4: [Full Name]** | **Frontend Development** | Dashboard, Shopping and Investment modes, algorithm visualization, step-by-step replay, Performance Analysis, What-If Budget Analysis, and Export interface. | `frontend/src/App.tsx`, `frontend/src/pages/Dashboard.tsx`, `frontend/src/pages/PerformanceAnalysis.tsx`, `frontend/src/pages/WhatIfAnalysis.tsx`, `frontend/src/pages/ExportReports.tsx`, `frontend/src/pages/SavedRuns.tsx`, `frontend/src/components/SearchTree.tsx`, `frontend/src/components/TreeGraphic.tsx`, `frontend/src/components/ItemTable.tsx`, `frontend/src/components/SelectionPanel.tsx`, `frontend/src/components/Results.tsx`, `frontend/src/hooks/useWorkspace.ts`, `frontend/src/hooks/useDraftHistory.ts`, `frontend/src/manualSelection.ts`, `frontend/src/frontend_logic.test.mjs` |
 
 ## 31. Conclusion and Future Scope
 ### Conclusion

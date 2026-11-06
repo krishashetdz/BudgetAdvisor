@@ -17,6 +17,7 @@ from starlette.middleware.cors import CORSMiddleware
 from models import (
     BenchmarkRequest,
     BenchmarkResponse,
+    CUSTOM_VARIATION_DISCLOSURE,
     Dataset,
     ReportExportRequest,
     Run,
@@ -376,7 +377,16 @@ async def export_benchmark_csv(req: BenchmarkRequest):
     return Response(
         content=csv_text.encode('utf-8'),
         media_type='text/csv; charset=utf-8',
-        headers={'Content-Disposition': f'attachment; filename="{filename}"'},
+        headers={
+            'Content-Disposition': f'attachment; filename="{filename}"',
+            'X-Dataset-Name': bench_result.dataset_name,
+            'X-Dataset-Source': bench_result.dataset_source,
+            'X-Original-Dataset-Size': str(bench_result.original_dataset_size),
+            'X-Max-Expanded-Dataset-Size': str(bench_result.max_expanded_dataset_size),
+            'X-Benchmark-Seed': str(bench_result.seed),
+            'X-Uses-Generated-Variations': 'true' if bench_result.uses_generated_variations else 'false',
+            'X-Dataset-Expansion-Note': CUSTOM_VARIATION_DISCLOSURE,
+        },
     )
 
 

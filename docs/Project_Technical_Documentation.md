@@ -2,11 +2,11 @@
 
 * **Project Title:** BudgetAdvisor — Budget-Constrained Shopping & Investment Advisor
 * **Project Group ID:** G12
-* **Team Members:**
-  * **Kris Rodrigues** - Project Lead & Systems Architect (FIFO Branch and Bound Lead)
-  * **Krisha Shet** - Algorithm & Baseline Verification Engineer (LC B&B & Sparse DP)
-  * **Megha Gobre** - Backend Infrastructure & Analytical Engines Engineer
-  * **Jeolita Parpatekar** - Frontend & UI/UX Visualization Engineer
+* **Team Members (Editable Placeholders — Manual Input Required Before Submission):**
+  * **Member 1: [Full Name]** — FIFO Algorithm Development
+  * **Member 2: [Full Name]** — LC and Algorithm Verification
+  * **Member 3: [Full Name]** — Backend Development
+  * **Member 4: [Full Name]** — Frontend Development
 * **Assigned Topic:** 0/1 Knapsack Problem using FIFO Branch and Bound and Least Cost (LC) Branch and Bound
 * **Verification Baseline:** Independent Sparse-Cost 0/1 Dynamic Programming
 
@@ -20,17 +20,17 @@ The system is architected into two decoupled tiers:
    * `solver.py`: Exact fixed-point (integer hundredths) implementation of FIFO Branch and Bound (`collections.deque`) and LC Branch and Bound (`heapq`) with index-based $O(1)$-auxiliary-space fractional upper-bound evaluation.
    * `dp_solver.py`: Independent Sparse-Cost Dynamic Programming solver over reachable integer-hundredth cost states.
    * `computation.py`: Concurrent `ThreadPoolExecutor` runner executing FIFO, LC, and DP in parallel and determining the canonical recommended strategy.
-   * `benchmark.py`: Multi-size empirical benchmarking engine ($5, 10, 15, 20, 24$ items) with warm-up execution, configurable repetitions, median execution time calculation, peak queue tracking (`max_queue_size`), and DP verification.
+   * `benchmark.py`: Multi-size empirical benchmarking engine ($5, 10, 15, 20, 24$ items) with warm-up execution, configurable repetitions, median execution time calculation, peak queue tracking (`max_queue_size`), custom variation disclosure metadata (`original_dataset_size`, `expanded_dataset_size`, `uses_generated_variations`), and DP verification.
    * `sensitivity.py`: Parametric What-If Budget Sensitivity engine evaluating optimal combinations across user-selected budget intervals and generating data-driven insights.
-   * `report_generator.py`: Zero-dependency PDF 1.4 vector report builder (producing a 2-page, 7-section academic report with separated header metadata, mathematical verification assertions, embedded vector sensitivity curve, and `"Page X of Y"` footers) and 24-column CSV benchmark exporter with explicit `Dataset Name`, `Dataset Source`, and `Seed` columns.
-   * `models.py`: Strict Pydantic validation schemas (compatible with both Pydantic v1 and v2) enforcing finite decimal precision ($\le 2$ decimal places), positive costs, valid budgets, unique item IDs, and mode-specific score ranges.
+   * `report_generator.py`: Zero-dependency PDF 1.4 vector report builder (producing a 2-page, 7-section academic report with separated header metadata, mathematical verification assertions, accurate `bound-pruned` and `infeasible-pruned` node breakdown, embedded vector sensitivity curve, and `"Page X of Y"` footers) and 24-column CSV benchmark exporter with explicit `Dataset Name`, `Dataset Source`, and `Seed` columns.
+   * `models.py`: Strict Pydantic validation schemas (compatible with both Pydantic v1 and v2) enforcing finite decimal precision ($\le 2$ decimal places), positive costs, valid budgets, unique item IDs, shared benchmark constants (`SHARED_BENCHMARK_SIZES = [5, 10, 15, 20, 24]`), and mode-specific score ranges.
    * `server.py`: FastAPI REST and NDJSON streaming server with bounded request payload middleware ($32\text{ KB}$ limit), concurrency semaphores, and MongoDB persistence with automatic `_InMemoryClient` fallback.
 
 2. **React + TypeScript Frontend (`frontend/src/`):**
    * `/` (`pages/Dashboard.tsx`): Interactive Optimizer workspace with Shopping and Investment modes, budget slider/input, editable item table, Undo/Redo history, manual selection comparison, side-by-side SVG decision tree race (`SearchTree.tsx`, `TreeGraphic.tsx`), step-by-step replay controls, and tri-method correctness strip (`Results.tsx`).
-   * `/performance` (`pages/PerformanceAnalysis.tsx`): Empirical scaling benchmark suite with 4 Recharts graphs (*Execution Time*, *Nodes Explored*, *Nodes Pruned*, *Maximum Queue Size vs. Dataset Size*) and side-by-side verification table.
+   * `/performance` (`pages/PerformanceAnalysis.tsx`): Empirical scaling benchmark suite with custom variation disclosure, 4 Recharts graphs (*Execution Time*, *Nodes Explored*, *Nodes Pruned*, *Maximum Queue Size vs. Dataset Size*), and side-by-side verification table.
    * `/what-if` (`pages/WhatIfAnalysis.tsx`): Parametric What-If Budget Sensitivity sweep with step-frontier chart, interactive budget-point scrubber, and automated sensitivity insights.
-   * `/reports` (`pages/ExportReports.tsx`): Shared benchmark/report configuration and one-click generation of the 7-section PDF Optimization Report and 24-column Benchmark CSV Export.
+   * `/reports` (`pages/ExportReports.tsx`): Shared benchmark/report configuration (`SHARED_BENCHMARK_SIZES = [5, 10, 15, 20, 24]`) and one-click generation of the 7-section PDF Optimization Report and 24-column Benchmark CSV Export.
    * `/runs` (`pages/SavedRuns.tsx`): Persistent collection of saved optimization runs with restore and delete workflows.
    * `/method` (`pages/Method.tsx`): Behind the Algorithm theoretical reference covering the 0/1 Knapsack formulation, FIFO vs. LC mechanics, 8-step operation complexity, Best/Average/Worst-case bounds, Sparse DP complexity, 5-part space complexity distinction, 6-part node-limit semantics, and comparison table.
 
@@ -81,7 +81,7 @@ For a node at tree level `depth` with current `cost` and `score`, `upper(depth, 
 
 1. **Nodes Generated (`generated`):** Incremented whenever a node is created and pushed into the frontier via `push(node)` ($\text{generated} = 1 + 2 \times \text{expanded}$). Includes both `include` and `exclude` children (even when `include` exceeds `budget`).
 2. **Nodes Explored / Visited (`visited`):** Incremented when a node is popped from the frontier (`queue.popleft()` in FIFO or `heapq.heappop(heap)` in LC), satisfying $\text{visited} = \text{expanded} + \text{pruned} + \text{leaf\_visited}$.
-3. **Nodes Pruned (`pruned`):** Explored (popped) nodes discarded without expansion ($\text{infeasible\_pruned} + \text{bound\_pruned}$).
+3. **Nodes Pruned (`pruned`):** Explored (popped) nodes discarded without expansion ($\text{pruned} = \text{bound\_pruned} + \text{infeasible\_pruned}$).
 4. **Nodes Remaining in Frontier (`frontier_remaining`):** Live unpopped nodes still in the queue or heap when the search terminates ($\text{generated} = \text{visited} + \text{frontier\_remaining}$). Optimality is proven if and only if $\text{frontier\_remaining} == 0$.
 5. **Configured Search Node Limit (`max_nodes <= 50,000`):** Caps **explored (`visited`)** nodes (`visited <= max_nodes`). Because each expanded node generates 2 children, `generated` can reach up to $2 \times \text{visited} + 1 \le 100,001$.
 6. **Execution Timeout (`time_limit_ms <= 1,500` ms):** Stops the loop when elapsed wall-clock time reaches `time_limit_ms`, setting `stop_reason = 'time_limit'` and `proven_optimal = False` if `frontier_remaining > 0`.
@@ -110,6 +110,6 @@ Let $n$ be the number of items, $k$ be the number of search nodes generated/expl
 
 ## 5. Verification & Test Artifacts Inventory (`test_reports/`)
 
-* `test_reports/pytest/pytest_results.xml`: Automated JUnit XML report recording **105 passing backend/integration test cases** (`0` failures, `0` skipped).
-* `frontend/src/frontend_logic.test.mjs`: Automated Node.js test suite recording **5 passing frontend logic test suites** covering `manualSelection.ts`, `useDraftHistory.ts` (Undo/Redo), and `localSolver.ts`.
-* `test_reports/artifacts_iter2/`, `test_reports/artifacts_iter3/`, `test_reports/artifacts_iter4/`: Browser verification captures across desktop and mobile viewports.
+* `test_reports/pytest/pytest_results.xml`: Automated JUnit XML report recording **108 passing backend/integration test cases** (`0` failures, `0` skipped).
+* `frontend/src/frontend_logic.test.mjs`: Automated Node.js test suite recording **6 passing frontend logic test suites** covering `manualSelection.ts`, `useDraftHistory.ts` (Undo/Redo), and `localSolver.ts`.
+* `test_reports/generated_exports/`: Regenerated 2-page PDF reports (`budgetadvisor_shopping_report.pdf`, `budgetadvisor_investment_report.pdf`) and 24-column CSV benchmark exports (`budgetadvisor_shopping_benchmark.csv`, `budgetadvisor_investment_benchmark.csv`) using the shared `[5, 10, 15, 20, 24]` benchmark configuration.

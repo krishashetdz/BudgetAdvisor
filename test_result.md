@@ -127,7 +127,7 @@ backend:
     status_history:
       - working: true
         agent: "main"
-        comment: "LC priority-queue-based search with (-node.bound, node.id, node) ordering and index-based O(1) auxiliary space upper bound. Explores highest promising bound first. Pruning, bounding, zero-budget/no-fit (2n+1 nodes), and node-limit semantics (visited vs generated) verified."
+        comment: "LC priority-queue-based search with (-node.bound, node.id, node) ordering and index-based O(1) auxiliary space upper bound. Explores highest promising bound first. Pruning (bound_pruned + infeasible_pruned), bounding, zero-budget/no-fit (2n+1 nodes), and node-limit semantics (visited vs generated) verified."
 
   - task: "Independent Dynamic Programming (DP) Baseline Solver"
     implemented: true
@@ -151,7 +151,7 @@ backend:
     status_history:
       - working: true
         agent: "main"
-        comment: "Verified identical datasets for FIFO & LC, explicit dataset_name & seed metadata, size deduplication/sorting, warm-up execution, multi-repetition median calculation, generated/explored/pruned/max_queue_size counts, DP agreement, and node/time limit handling."
+        comment: "Verified identical datasets for FIFO & LC, explicit dataset_name, seed, original_dataset_size, expanded_dataset_size, uses_generated_variations, and expansion_note metadata, size deduplication/sorting, warm-up execution, multi-repetition median calculation, generated/explored/pruned/max_queue_size counts, DP agreement, and node/time limit handling."
 
   - task: "What-If Budget Sensitivity Analysis & API (/api/sensitivity)"
     implemented: true
@@ -175,7 +175,7 @@ backend:
     status_history:
       - working: true
         agent: "main"
-        comment: "Verified 2-page PDF layout, separated Group G12 & UTC timestamp header, mathematical verification assertions, explicit dataset source/name/seed/run_id metadata, and 24-column CSV export consistency."
+        comment: "Verified 2-page PDF layout, separated Group G12 & UTC timestamp header, mathematical verification assertions, exact bound-pruned and infeasible-pruned node phrasing in Section 4 & Section 7, shared [5, 10, 15, 20, 24] benchmark configuration, custom variation disclosure, and 24-column CSV export consistency."
 
 frontend:
   - task: "Shopping & Investment Mode Selection, Manual Selection & Undo/Redo Controls"
@@ -200,7 +200,19 @@ frontend:
     status_history:
       - working: true
         agent: "main"
-        comment: "Verified ancestor-closed 30-node trace, on_solution path highlighting, and monotonic SearchFrame progress snapshots for step-by-step replay."
+        comment: "Verified ancestor-closed 30-node trace, on_solution path highlighting, bound-pruned and infeasible-pruned breakdown, and monotonic SearchFrame progress snapshots for step-by-step replay."
+
+  - task: "Shared PDF & CSV Export Configuration & Custom Variation Disclosure"
+    implemented: true
+    working: true
+    file: "frontend/src/pages/ExportReports.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Unified PDF and CSV benchmark export configurations via SHARED_BENCHMARK_SIZES = [5, 10, 15, 20, 24] and buildSharedExportPayloads, with explicit dataset source, seed, custom variation disclosure, and separate execution run note."
 
   - task: "Behind the Algorithm Theoretical Complexity & Node-Limit Reference"
     implemented: true
@@ -216,8 +228,8 @@ frontend:
 
 metadata:
   created_by: "main_agent"
-  version: "3.0"
-  test_sequence: 3
+  version: "4.0"
+  test_sequence: 4
   run_ui: true
 
 test_plan:
@@ -227,13 +239,14 @@ test_plan:
     - "Performance Benchmarking Suite & API (/api/benchmark)"
     - "What-If Budget Sensitivity Analysis & API (/api/sensitivity)"
     - "PDF & CSV Optimization Report Generator (/api/report/pdf, /api/report/csv)"
+    - "Shared PDF & CSV Export Configuration & Custom Variation Disclosure"
   stuck_tasks: []
   test_all: true
   test_priority: "high_first"
 
 agent_communication:
   - agent: "main"
-    message: "Executed full backend pytest suite (105 passed, 0 failed, 0 skipped) and frontend Node.js logic test suite (5 passed, 0 failed, 0 skipped) on 2026-11-06."
+    message: "Executed full backend pytest suite (108 passed, 0 failed, 0 skipped) and frontend Node.js logic test suite (6 passed, 0 failed, 0 skipped) on 2026-11-06."
 
 #====================================================================================================
 # Latest Automated Test Execution Summary (2026-11-06)
@@ -242,8 +255,8 @@ agent_communication:
 #
 # 1. Backend & End-to-End Pytest Suite:
 #    - Command: `cd backend && pytest -v`
-#    - Tests Executed: 105
-#    - Passed Tests: 105
+#    - Tests Executed: 108
+#    - Passed Tests: 108
 #    - Failed Tests: 0
 #    - Skipped Tests: 0
 #    - Breakdown by Module:
@@ -251,16 +264,16 @@ agent_communication:
 #      * `tests/test_api_e2e_budget_advisor.py`: 17 passed
 #      * `tests/test_dp_stream_regression.py`: 16 passed
 #      * `tests/test_new_features_benchmark_sensitivity_reports.py`: 17 passed
-#      * `tests/test_comprehensive_rubric_audit.py`: 18 passed (includes AST slice check, zero-budget/no-fit node counts, PDF/CSV dataset consistency, and subprocess execution of frontend logic suite)
+#      * `tests/test_comprehensive_rubric_audit.py`: 21 passed (includes AST slice check, zero-budget/no-fit node counts, shared [5, 10, 15, 20, 24] PDF/CSV benchmark config, custom variation metadata & disclosure, pruning breakdown terminology, 4-member README placeholders, and subprocess execution of frontend logic suite)
 #
 # 2. Frontend Logic Test Suite (Node.js):
 #    - Command: `cd frontend && node --test src/frontend_logic.test.mjs`
-#    - Tests Executed: 5 subtest suites
-#    - Passed Tests: 5
+#    - Tests Executed: 6 subtest suites
+#    - Passed Tests: 6
 #    - Failed Tests: 0
 #    - Skipped Tests: 0
 #
-# 3. Remaining Limitations / Notes:
+# 3. Remaining Limitations / Manual Information Required:
 #    - Dataset size is intentionally bounded at 24 items (`max_length=24`), explored node visits at 50,000 (`max_nodes <= 50,000`), DP retained states at 50,000 / evaluations at 200,000, and per-solver wall-clock timeout at 1,500 ms to ensure interactive responsiveness.
 #    - When MongoDB is not running on `localhost:27017`, the backend automatically uses its built-in in-memory database fallback (`_InMemoryClient`), which supports full runtime CRUD within the server process lifetime.
-#    - Team member names and roles in `README.md` and `docs/Project_Technical_Documentation.md` are populated for Kris Rodrigues (Project Lead & Systems Architect), Krisha Shet (Algorithm & Baseline Verification), Megha Gobre (Backend Infrastructure & Analytical Engines), and Jeolita Parpatekar (Frontend & UI/UX Visualization).
+#    - Manual Information Required from Group G12: In `README.md` and `docs/Project_Technical_Documentation.md`, team member names are retained as editable placeholders (`Member 1: [Full Name]`, `Member 2: [Full Name]`, `Member 3: [Full Name]`, `Member 4: [Full Name]`) with the suggested four-member responsibility structure. Replace `[Full Name]` with confirmed student names and confirm authorship prior to final submission.

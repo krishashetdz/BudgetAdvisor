@@ -11,7 +11,8 @@ Covers all Professor Mini-Project Guideline and Final Technical Audit requiremen
   execution time limits, invalid API requests, and database unavailability / in-memory fallback.
 - Category 3 & 4 (Regression across UI & Application Logic): Shopping & Investment modes,
   manual selection hundredths & over-budget calculation, search tree & step-by-step replay frames,
-  saved runs lifecycle, Undo/Redo draft history state machine, and PDF/CSV dataset consistency & mathematical verification.
+  saved runs lifecycle, Undo/Redo draft history state machine, shared PDF/CSV benchmark-size configuration
+  ([5, 10, 15, 20, 24]), custom-derived variation disclosure, and pruning terminology consistency.
 """
 from __future__ import annotations
 
@@ -39,8 +40,11 @@ from computation import compute_run  # noqa: E402
 from dp_solver import solve_dp  # noqa: E402
 from models import (  # noqa: E402
     BenchmarkRequest,
+    CUSTOM_VARIATION_DISCLOSURE,
     Item,
     ReportExportRequest,
+    SHARED_BENCHMARK_REPETITIONS,
+    SHARED_BENCHMARK_SIZES,
     SensitivityRequest,
     SolveRequest,
 )
@@ -436,7 +440,7 @@ def test_pdf_report_with_benchmark_table_and_empty_dataset(api_client):
     )
     pdf_bytes = generate_optimization_pdf_report(req_with_bench)
     reader = pypdf.PdfReader(io.BytesIO(pdf_bytes))
-    full_text = "\n".join(p.extract_text() or "" for p in reader.pages)
+    full_text = " ".join("\n".join(p.extract_text() or "" for p in reader.pages).split())
     assert "Group G12" in full_text
     assert "Multi-Size Scaling Benchmark Summary" in full_text
 
@@ -475,29 +479,29 @@ def test_pdf_and_csv_dataset_consistency_and_mathematical_verification():
         sensitivity_intervals=6,
         include_benchmark=True,
         benchmark_dataset_source="custom",
-        benchmark_sizes=[5, 10, 15, 20, 24],
+        benchmark_sizes=SHARED_BENCHMARK_SIZES,
         benchmark_repetitions=2,
         benchmark_seed=42,
     )
     pdf_bytes = generate_optimization_pdf_report(pdf_req)
     reader = pypdf.PdfReader(io.BytesIO(pdf_bytes))
     assert len(reader.pages) == 2
-    pdf_text = "\n".join(p.extract_text() or "" for p in reader.pages)
+    pdf_text = " ".join("\n".join(p.extract_text() or "" for p in reader.pages).split())
     assert "Source: Custom [Shopping Advisor Dataset]" in pdf_text
     assert "Seed 42" in pdf_text
     assert "Note on Custom Datasets:" in pdf_text
     assert "reproducible variations derived from the original dataset" in pdf_text
 
-    # Verify Issue 1: Correct pruning terminology with separate bound-pruned and infeasible counts
-    assert "bound-pruned nodes" in pdf_text
-    assert "infeasible nodes" in pdf_text
+    # Verify Issue 1: Correct pruning terminology with separate bound-pruned and infeasible-pruned counts
+    assert "LC Branch and Bound explored 41 nodes and pruned 20 nodes" in pdf_text
+    assert "including 11 bound-pruned nodes and 9 infeasible-pruned nodes" in pdf_text
     assert "via the fractional-knapsack upper bound" not in pdf_text
 
     csv_req = BenchmarkRequest(
         dataset_name="Shopping Advisor Dataset",
         mode="shopping",
         dataset_source="custom",
-        sizes=[5, 10, 15, 20, 24],
+        sizes=SHARED_BENCHMARK_SIZES,
         repetitions=2,
         seed=42,
         budget=budget,
@@ -514,6 +518,103 @@ def test_pdf_and_csv_dataset_consistency_and_mathematical_verification():
         assert f"{brow.lc.optimal_value:,.2f}" in pdf_text
         assert f"{brow.fifo.nodes_explored:,}" in pdf_text
         assert f"{brow.lc.nodes_explored:,}" in pdf_text
+
+
+def test_shared_pdf_and_csv_benchmark_configuration_and_export_reports_source():
+    """Verify both backend models and frontend ExportReports.tsx use the shared [5, 10, 15, 20, 24] benchmark configuration."""
+    assert SHARED_BENCHMARK_SIZES == [5, 10, 15, 20, 24]
+    assert SHARED_BENCHMARK_REPETITIONS == 3
+
+    default_bench = BenchmarkRequest()
+    assert default_bench.sizes == [5, 10, 15, 20, 24]
+    assert default_bench.repetitions == 3
+
+    shopping = next(s for s in SAMPLES if s["mode"] == "shopping")
+    default_report = ReportExportRequest(mode="shopping", items=shopping["items"], budget=Decimal(shopping["budget"]))
+    assert default_report.benchmark_sizes == [5, 10, 15, 20, 24]
+    assert default_report.benchmark_repetitions == 3
+
+    repo_root = Path(__file__).resolve().parents[2]
+    export_tsx = (repo_root / "frontend" / "src" / "pages" / "ExportReports.tsx").read_text(encoding="utf-8")
+    local_solver_ts = (repo_root / "frontend" / "src" / "localSolver.ts").read_text(encoding="utf-8")
+    assert "SHARED_BENCHMARK_SIZES = [5, 10, 15, 20, 24]" in local_solver_ts
+    assert "buildSharedExportPayloads" in export_tsx
+
+
+def test_custom_benchmark_variation_metadata_and_disclosure_across_layers():
+    """Verify custom benchmark variation expansion metadata (original_dataset_size, expanded_dataset_size,
+    uses_generated_variations, seed, dataset_source) and disclosure text across backend, PDF, and docs."""
+    shopping = next(s for s in SAMPLES if s["mode"] == "shopping")
+    items = shopping["items"]
+    budget = Decimal(shopping["budget"])
+
+    req = BenchmarkRequest(
+        dataset_name="Shopping Custom Expansion Test",
+        mode="shopping",
+        dataset_source="custom",
+        sizes=[5, 8, 15, 24],
+        repetitions=1,
+        seed=42,
+        budget=budget,
+        custom_items=items,
+    )
+    res = run_benchmark_suite(req)
+    assert res.original_dataset_size == 8
+    assert res.max_expanded_dataset_size == 24
+    assert res.uses_generated_variations is True
+    assert res.expansion_note == CUSTOM_VARIATION_DISCLOSURE
+
+    by_size = {r.dataset_size: r for r in res.rows}
+    assert by_size[5].original_dataset_size == 8
+    assert by_size[5].expanded_dataset_size == 5
+    assert by_size[5].uses_generated_variations is False
+    assert by_size[8].uses_generated_variations is False
+    assert by_size[15].uses_generated_variations is True
+    assert by_size[24].uses_generated_variations is True
+
+    repo_root = Path(__file__).resolve().parents[2]
+    readme_text = (repo_root / "README.md").read_text(encoding="utf-8")
+    perf_tsx = (repo_root / "frontend" / "src" / "pages" / "PerformanceAnalysis.tsx").read_text(encoding="utf-8")
+    assert "Datasets exceeding the original custom item count are expanded using reproducible variations derived from the original dataset." in readme_text
+    assert "CUSTOM_VARIATION_DISCLOSURE" in perf_tsx
+
+
+def test_pruning_terminology_and_readme_four_member_placeholders():
+    """Verify pruning breakdown invariants and four-member editable [Full Name] placeholders in README.md."""
+    for sample in SAMPLES:
+        req = SolveRequest(mode=sample["mode"], items=sample["items"], budget=Decimal(sample["budget"]))
+        run = compute_run(req)
+        for res in (run.fifo, run.lc):
+            assert res.pruned == res.bound_pruned + res.infeasible_pruned
+            assert res.bound_pruned >= 0
+            assert res.infeasible_pruned >= 0
+
+        pdf_req = ReportExportRequest(
+            dataset_name=f"{sample['mode'].title()} Advisor Dataset",
+            mode=sample["mode"],
+            items=sample["items"],
+            budget=Decimal(sample["budget"]),
+            include_sensitivity=False,
+            include_benchmark=False,
+        )
+        pdf_bytes = generate_optimization_pdf_report(pdf_req)
+        reader = pypdf.PdfReader(io.BytesIO(pdf_bytes))
+        text = " ".join("\n".join(p.extract_text() or "" for p in reader.pages).split())
+        assert (
+            f"LC Branch and Bound explored {run.lc.visited:,} nodes and pruned {run.lc.pruned:,} nodes, "
+            f"including {run.lc.bound_pruned:,} bound-pruned nodes and {run.lc.infeasible_pruned:,} infeasible-pruned nodes"
+        ) in text
+
+    repo_root = Path(__file__).resolve().parents[2]
+    readme_text = (repo_root / "README.md").read_text(encoding="utf-8")
+    assert "Member 1: [Full Name]" in readme_text
+    assert "Member 2: [Full Name]" in readme_text
+    assert "Member 3: [Full Name]" in readme_text
+    assert "Member 4: [Full Name]" in readme_text
+    assert "Member 1 — FIFO Algorithm Development" in readme_text
+    assert "Member 2 — LC and Algorithm Verification" in readme_text
+    assert "Member 3 — Backend Development" in readme_text
+    assert "Member 4 — Frontend Development" in readme_text
 
 
 # ============================================================================
@@ -568,5 +669,5 @@ def test_frontend_manual_selection_undo_redo_and_local_solver_suite():
         timeout=30,
     )
     assert res.returncode == 0, f"Frontend test suite failed:\n{res.stdout}\n{res.stderr}"
-    assert "pass 5" in res.stdout
+    assert "pass 6" in res.stdout
     assert "fail 0" in res.stdout

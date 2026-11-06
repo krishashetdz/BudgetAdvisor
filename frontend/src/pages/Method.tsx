@@ -38,7 +38,7 @@ const rules = [
   {
     icon: ListOrdered,
     title: 'Generated vs. explored (visited) vs. pruned nodes',
-    text: 'A node is generated when constructed and pushed into the frontier (root + 2 children per expanded node, including infeasible include children), and explored (visited) only when popped from the frontier. Budget-infeasible (cost > budget) and bound-dominated (bound < best_score) nodes are counted as generated when pushed and as visited + pruned when popped. Thus generated = 1 + 2 × expanded = visited + frontier_remaining holds at every step.',
+    text: 'A node is generated when constructed and pushed into the frontier (root + 2 children per expanded node, including infeasible include children), and explored (visited) only when popped from the frontier. Total pruned nodes = bound-pruned nodes (bound < best_score) + infeasible-pruned nodes (cost > budget), both counted when popped. Thus generated = 1 + 2 × expanded = visited + frontier_remaining holds at every step.',
   },
   {
     icon: ShieldCheck,
@@ -47,8 +47,8 @@ const rules = [
   },
   {
     icon: Timer,
-    title: 'Bounded explored work, honest status',
-    text: 'The configured search node limit (max_nodes ≤ 50,000) caps explored (visited) nodes—not generated nodes—alongside a 1,500 ms execution timeout and at most 24 input items. Because each expanded node creates 2 children, generated nodes can legitimately reach up to 2 × visited + 1 ≤ 100,001. DP is limited to 50,000 retained states, 200,000 state evaluations, and 1,500 ms. Capped runs report best found, not proven optimal.',
+    title: 'Bounded explored work & custom benchmark expansion',
+    text: 'The configured search node limit (max_nodes ≤ 50,000) caps explored (visited) nodes—not generated nodes—alongside a 1,500 ms execution timeout and at most 24 input items. In multi-size benchmarking ([5, 10, 15, 20, 24] items), datasets exceeding the original custom item count are expanded using reproducible variations derived from the original dataset for algorithm scalability testing.',
   },
   {
     icon: GitBranch,
@@ -175,8 +175,8 @@ export default function Method() {
       <section className="theory-section" data-testid="theoretical-grounding-section">
         <div className="section-heading">
           <div>
-            <span className="section-kicker">THEORETICAL GROUNDING & ASYMPTOTIC ANALYSIS</span>
-            <h2 data-testid="complexity-heading">Time & Space Complexity Analysis</h2>
+            <span className="section-kicker">THEORETICAL GROUNDING &amp; ASYMPTOTIC ANALYSIS</span>
+            <h2 data-testid="complexity-heading">Time &amp; Space Complexity Analysis</h2>
           </div>
           <span className="count-tag">Verified against actual Python &amp; TypeScript code</span>
         </div>
@@ -356,7 +356,7 @@ export default function Method() {
                 <strong>2. Explored / Visited Nodes (<code>visited</code> / <code>nodes_explored</code>):</strong> Every node popped from the frontier and evaluated in the search loop (<code>visited = expanded + pruned + leaf_visited</code>).
               </li>
               <li>
-                <strong>3. Pruned Nodes (<code>pruned</code> / <code>nodes_pruned</code>):</strong> Explored (popped) nodes discarded without expansion: <code>pruned = infeasible_pruned (cost &gt; budget) + bound_pruned (bound &lt; best_score)</code>. Unpopped children still in the frontier when a limit is hit are counted in <code>frontier_remaining</code>, not in <code>visited</code> or <code>pruned</code>.
+                <strong>3. Pruned Nodes (<code>pruned</code> / <code>nodes_pruned</code>):</strong> Explored (popped) nodes discarded without expansion: <code>pruned = bound_pruned (bound &lt; best_score) + infeasible_pruned (cost &gt; budget)</code>. Both bound-pruned and infeasible-pruned counts are tracked separately and reported across the UI, CSV, and PDF conclusion. Unpopped children still in the frontier when a limit is hit are counted in <code>frontier_remaining</code>, not in <code>visited</code> or <code>pruned</code>.
               </li>
               <li>
                 <strong>4. Nodes Remaining in Frontier (<code>frontier_remaining</code>):</strong> Live unpopped nodes still in the queue or min-heap at termination (satisfying <code>generated = visited + frontier_remaining</code>). Optimality is proven if and only if <code>frontier_remaining == 0</code>.
